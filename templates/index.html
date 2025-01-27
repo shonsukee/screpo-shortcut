@@ -36,7 +36,7 @@
                         cols="30"
                         rows="5"
                         placeholder="スクレポを入力"
-                        onchange="saveText(this.id, this.value)"
+                        oninput="saveText(this.id, this.value)"
                     ></textarea>
                     <input type="hidden" name="students" value="{{ data['students'] }}">
                     <input type="hidden" name="index" value="{{ student.index }}">
@@ -58,13 +58,22 @@
 </div>
 
 <script>
-    // ログイン情報の保存
+    // 講師用ログイン情報の保存
     document.getElementById("fetch_student_info").addEventListener("click", function() {
         const user_id = document.getElementById("user_id").value;
         localStorage.setItem("user_id", user_id);
     });
 
-    // ログイン情報ボタンの表示
+    // 講師用ログインIDの格納
+    window.addEventListener("load", function() {
+        const user_id = document.getElementById("user_id");
+        const storedUserId = localStorage.getItem("user_id");
+        if (storedUserId) {
+            user_id.value = storedUserId;
+        }
+    });
+
+    // 講師用ログイン情報ボタンの表示
     document.getElementById("toggle_button").addEventListener("click", function() {
         const loginParams = document.querySelector(".login");
         const button = document.getElementById("toggle_button");
@@ -78,30 +87,31 @@
         }
     });
 
-    // ログインIDの保持
-    window.addEventListener("load", function() {
-        const user_id = document.getElementById("user_id");
-        const storedUserId = localStorage.getItem("user_id");
-        if (storedUserId) {
-            user_id.value = storedUserId;
-        }
-    });
-
-    // 生徒情報保存
+    // 未登録のスクレポを一時保存
     function saveText(student_id, text) {
         localStorage.setItem(student_id, text);
     }
 
-    // 生徒情報取得
-    window.onload = function () {
+    // スクレポをテキストボックスに格納
+    window.addEventListener("load", function() {
         const students = JSON.parse('{{ data["students"] | tojson | safe }}');
         students.forEach(student => {
-            const student_id = "content_"+student.index;
-            const context = localStorage.getItem(student_id);
-            if (context) {
-                document.getElementById(student_id).value = context;
+            const student_id = "content_" + student.index;
+            console.log(student.content);
+            let content = "";
+
+            // 登録済みの場合
+            if (student.content) {
+                content = student.content;
+                localStorage.setItem(student_id, content);
             }
+            // 未登録の場合
+            else {
+                content = localStorage.getItem(student_id);
+            }
+
+            document.getElementById(student_id).value = content;
         });
-    }
+    });
 </script>
 {% endblock %}

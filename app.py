@@ -59,27 +59,32 @@ def students():
     # TODO: 変更！
     message_element = driver.find_element(By.CSS_SELECTOR, "label[for='schedule']")
     print(f"スクレイピングしたメッセージ: {message_element.text}")
+
     students = {
         "students": [
             {
                 "index": 1,
                 "class_start_time": "17:30",
-                "name": "生徒A"
+                "name": "生徒A",
+                "content": "生徒Aのスクレポですわ"
             },
             {
                 "index": 2,
                 "class_start_time": "17:30",
-                "name": "生徒B"
+                "name": "生徒B",
+                "content": ""
             },
             {
                 "index": 3,
                 "class_start_time": "17:30",
-                "name": "生徒C"
+                "name": "生徒C",
+                "content": "生徒Cのスクレポですわ"
             },
             {
                 "index": 4,
                 "class_start_time": "19:00",
-                "name": "生徒A"
+                "name": "生徒A",
+                "content": "生徒Aのスクレポですわ2"
             }
         ]
     }
@@ -159,6 +164,7 @@ def register():
     # driver.find_element(By.ID,"登録ボタンのIDに要変更！").click()
     driver.quit()
 
+    # 登録済みの生徒をフィルタリング
     students = {
         "students": [
             student for student in students
