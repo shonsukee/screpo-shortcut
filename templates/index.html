@@ -1,0 +1,74 @@
+{% extends "layout.html" %}
+
+{% block content %}
+<div class="container">
+    <h1 class="title">スクレポ入力</h1>
+    <div class="wrap">
+        <button id="toggle_button">ログイン情報入力</button>
+        <form action="/students" method="post" class="login">
+            <div class="login-row">
+                <label for="user_id" class="login-text">ユーザーID</label>
+                <input type="text" id="user_id" name="user_id" value="{{ user_id }}" required>
+            </div>
+            <div class="login-row">
+                <label for="password" class="login-text">パスワード</label>
+                <input type="password" id="password" name="password" value="{{ password }}" required>
+            </div>
+            <button type="submit" id="fetch_student_info">生徒情報取得</button>
+        </form>
+    </div>
+
+    {% if data %}
+        <div class="students_wrap">
+            {% for student in data["students"] %}
+                <form action="/register" method="post">
+                    <div class="content">
+                        <div class="student_name">
+                            <label for="student_{{ student.index }}">{{student.class_start_time}}〜 {{ student.name }}</label>
+                        </div>
+                        <button type="submit" class="register_button">登録</button>
+                    </div>
+
+                    <textarea
+                        name="content_{{ student.index }}"
+                        class="student_comment"
+                        id="content_{{ student.index }}"
+                        cols="30"
+                        rows="5"
+                        placeholder="スクレポを入力"
+                    ></textarea>
+                    <input type="hidden" name="students" value="{{ data['students'] }}">
+                    <input type="hidden" name="index" value="{{ student.index }}">
+                    <input type="hidden" name="class_start_time" value="{{ student.class_start_time }}">
+                    <input type="hidden" name="user_id" value="{{ user_id }}">
+                    <input type="hidden" name="password" value="{{ password }}">
+                </form>
+            {% endfor %}
+        </div>
+    {% elif error %}
+        <div class="no_student_wrap">
+            <p class="no_student" style="color: #9B003F;">{{ error }}</p>
+        </div>
+    {% else %}
+        <div class="no_student_wrap">
+            <p class="no_student" style="color:#1f2c5c;">本日の授業はありません</p>
+        </div>
+    {% endif %}
+</div>
+
+<script>
+    // ログイン情報ボタンの表示
+    document.getElementById("toggle_button").addEventListener("click", function() {
+        const loginParams = document.querySelector(".login");
+        const button = document.getElementById("toggle_button");
+
+        if (loginParams.style.display == "none" || loginParams.style.display == "") {
+            loginParams.style.display = "block";
+            button.textContent = "ログイン情報非表示";
+        } else {
+            loginParams.style.display = "none";
+            button.textContent = "ログイン情報入力";
+        }
+    });
+</script>
+{% endblock %}
