@@ -58,7 +58,18 @@
 </div>
 
 <script>
-    // 講師用ログイン情報の保存
+    // 日付が変わるとローカルストレージを初期化
+    window.addEventListener("load", function() {
+        const today = new Date().toLocaleDateString();
+        const lastAccessDate = localStorage.getItem("last_access_date");
+
+        if (!lastAccessDate || lastAccessDate !== today) {
+            localStorage.clear();
+            localStorage.setItem("last_access_date", today);
+        }
+    });
+
+    // 講師用ログインIDの保存
     document.getElementById("fetch_student_info").addEventListener("click", function() {
         const user_id = document.getElementById("user_id").value;
         localStorage.setItem("user_id", user_id);
