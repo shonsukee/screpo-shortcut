@@ -65,26 +65,30 @@ def students():
             {
                 "index": 1,
                 "class_start_time": "17:30",
-                "name": "生徒A",
-                "content": "生徒Aのスクレポですわ"
+                "name": "清水大河",
+                "content": "生徒Aのスクレポですわ",
+                "subject": "数学"
             },
             {
                 "index": 2,
                 "class_start_time": "17:30",
-                "name": "生徒B",
-                "content": ""
+                "name": "佐藤寿也",
+                "content": "",
+                "subject": "英語"
             },
             {
                 "index": 3,
                 "class_start_time": "17:30",
-                "name": "生徒C",
-                "content": "生徒Cのスクレポですわ"
+                "name": "茂野吾郎",
+                "content": "生徒Cのスクレポですわ",
+                "subject": "理科"
             },
             {
                 "index": 4,
                 "class_start_time": "19:00",
-                "name": "生徒A",
-                "content": "生徒Aのスクレポですわ2"
+                "name": "清水大河",
+                "content": "生徒Aのスクレポですわ2",
+                "subject": "数学"
             }
         ]
     }

@@ -4,7 +4,7 @@
 <div class="container">
     <h1 class="title">スクレポ入力</h1>
     <div class="wrap">
-        <button id="toggle_button">ログイン情報入力</button>
+        <button id="toggle_button">ログイン</button>
         <form action="/students" method="post" class="login">
             <div class="login-row">
                 <label for="user_id" class="login-text">ユーザーID</label>
@@ -24,7 +24,7 @@
                 <form action="/register" method="post">
                     <div class="content">
                         <div class="student_name">
-                            <label for="student_{{ student.index }}">{{student.class_start_time}}〜 {{ student.name }}</label>
+                            <label for="student_{{ student.index }}">{{student.class_start_time}}〜【{{ student.subject }}】{{ student.name }}</label>
                         </div>
                         <button type="submit" class="register_button">登録</button>
                     </div>
@@ -108,9 +108,8 @@
         const students = JSON.parse('{{ data["students"] | tojson | safe }}');
         students.forEach(student => {
             const student_id = "content_" + student.index;
-            console.log(student.content);
-            let content = "";
 
+            let content = "";
             // 登録済みの場合
             if (student.content) {
                 content = student.content;
