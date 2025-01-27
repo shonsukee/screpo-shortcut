@@ -14,7 +14,7 @@ day_schedule_url = "https://sukurepo.azurewebsites.net/teachers_report/t_daySche
 
 @app.route('/', methods=['GET'])
 def index():
-    return render_template('index.html', error="ログイン情報を入力して生徒情報を取得してください", data={ "students": [] })
+    return render_template('index.html', error="ログインを行って生徒情報を取得してください", data={ "students": [] })
 
 # 生徒情報の取得
 @app.route('/students', methods=['POST'])
