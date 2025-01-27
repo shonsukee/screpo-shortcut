@@ -43,13 +43,15 @@ def students():
 
         # 1-1. セッションタイムアウト時は再度ログインする
         WebDriverWait(driver, 1).until(
-            EC.presence_of_element_located((By.ID, "MAIN_MENU_TABLE"))
+            EC.presence_of_element_located(By.ID, "MAIN_MENU_TABLE")
         )
         page_source = driver.page_source
         if "セッション タイムアウト" in page_source:
             login(driver, user_id, password)
-    except Exception:
-        driver.quit()
+    except Exception as e:
+        print("例外が発生しました:", str(e))
+        if 'driver' in locals():
+            driver.quit()
         return render_template('index.html', user_id=user_id, password=password, error="ユーザIDもしくはパスワードが違います")
 
     # 2. 生徒情報ページへ遷移
