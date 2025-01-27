@@ -5,6 +5,7 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
+from tempfile import mkdtemp
 
 app = Flask(__name__)
 
@@ -36,6 +37,9 @@ def students():
     options.add_argument("--no-sandbox")
     options.add_argument("--disable-dev-shm-usage")
 
+    temp_dir = mkdtemp()
+    options.add_argument(f"--user-data-dir={temp_dir}")
+
     # 1. ログインする
     try:
         driver = webdriver.Chrome(options=options)
@@ -43,7 +47,7 @@ def students():
 
         # 1-1. セッションタイムアウト時は再度ログインする
         WebDriverWait(driver, 1).until(
-            EC.presence_of_element_located(By.ID, "MAIN_MENU_TABLE")
+            EC.presence_of_element_located((By.ID, "MAIN_MENU_TABLE"))
         )
         page_source = driver.page_source
         if "セッション タイムアウト" in page_source:
@@ -52,7 +56,7 @@ def students():
         print("例外が発生しました:", str(e))
         if 'driver' in locals():
             driver.quit()
-        return render_template('index.html', user_id=user_id, password=password, error="ユーザIDもしくはパスワードが違います")
+        return render_template('index.html', user_id=user_id, password=password, error="ユーザIDもしくはパスワードが違います", data={ "students": [] })
 
     # 2. 生徒情報ページへ遷移
     driver.find_element(By.XPATH, "//input[@value='本日の授業']").click()
@@ -101,7 +105,7 @@ def students():
         return render_template('index.html', user_id=user_id, password=password, data=students)
     # 担当生徒がいない場合
     else:
-        return render_template('index.html', user_id=user_id, password=password)
+        return render_template('index.html', user_id=user_id, password=password, data={ "students": [] })
 
 # スクレポの自動登録
 @app.route('/register', methods=['POST'])
@@ -152,7 +156,7 @@ def register():
 
     except Exception:
         driver.quit()
-        return render_template('index.html', user_id=user_id, password=password, error="ユーザIDもしくはパスワードが違います")
+        return render_template('index.html', user_id=user_id, password=password, error="ユーザIDもしくはパスワードが違います", data={ "students": [] })
 
     # 2. 入力済みである生徒名と時間を基に，記入ページを開く
     # TODO: 生徒ページの判別
@@ -181,7 +185,7 @@ def register():
     if len(students) > 0:
         return render_template('index.html', user_id=user_id, password=password, data=students)
     else:
-        return render_template('index.html', user_id=user_id, password=password)
+        return render_template('index.html', user_id=user_id, password=password, data={ "students": [] })
 
 if __name__ == '__main__':
     app.run(host="0.0.0.0", port=8080, debug=True)
