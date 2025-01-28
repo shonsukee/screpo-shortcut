@@ -29,6 +29,8 @@ def students():
         driver.find_element(By.NAME,"pass").send_keys(password)
         driver.find_element(By.ID,"LOGIN_SUBMIT_BUTTON").click()
 
+    start_time = datetime.datetime.now()
+
     # ユーザIDとパスワードを取得
     user_id = request.form.get('user_id')
     password = request.form.get('password')
@@ -50,24 +52,18 @@ def students():
 
         # 1. タイムアウトしている場合はログインする
         if "セッション タイムアウト" in html_text:
-            start_time = datetime.datetime.now()
             login(driver, user_id, password)
-            end_time = datetime.datetime.now()
-            print(f"再ログインの時間: {end_time - start_time}")
+            print(f"再ログインの時間: {datetime.datetime.now() - start_time}")
 
         # 2. 生徒情報ページへ遷移
-        start_time = datetime.datetime.now()
         driver.get(day_schedule_url)
-        end_time = datetime.datetime.now()
-        print(f"getした時間: {end_time - start_time}")
+        print(f"getした時間: {datetime.datetime.now() - start_time}")
 
         # 3. 生徒情報を取得
         # TODO: 変更！
-        start_time = datetime.datetime.now()
         message_element = driver.find_element(By.CSS_SELECTOR, "label[for='schedule']")
         print(f"スクレイピングしたメッセージ: {message_element.text}")
-        end_time = datetime.datetime.now()
-        print(f"スクレイピングまでの時間: {end_time - start_time}")
+        print(f"スクレイピングまでの時間: {datetime.datetime.now() - start_time}")
 
         students = {
             "students": [
@@ -103,6 +99,7 @@ def students():
         }
 
         driver.quit()
+        print(f"全体の時間: ", datetime.datetime.now() - start_time)
         # 担当生徒がいる場合
         if len(students) > 0:
             return render_template('index.html', user_id=user_id, password=password, data=students)
