@@ -18,20 +18,28 @@ login_url = "https://sukurepo.azurewebsites.net/teachers_report/T_report_login"
 target_url = "https://sukurepo.azurewebsites.net/teachers_report/t_menu"
 day_schedule_url = "https://sukurepo.azurewebsites.net/teachers_report/t_daySchedule"
 
-def init():
+def init(start_time):
     options = Options()
+    print(f"init内の時間: {datetime.datetime.now() - start_time}")
     options.add_argument("--headless")
+    print(f"init内の時間1: {datetime.datetime.now() - start_time}")
     options.add_argument("--disable-gpu")
+    print(f"init内の時間2: {datetime.datetime.now() - start_time}")
     options.add_argument("--no-sandbox")
+    print(f"init内の時間3: {datetime.datetime.now() - start_time}")
     options.add_argument("--disable-dev-shm-usage")
+    print(f"init内の時間4: {datetime.datetime.now() - start_time}")
+
     temp_dir = mkdtemp()
     options.add_argument(f"--user-data-dir={temp_dir}")
+    print(f"init内の時間5: {datetime.datetime.now() - start_time}")
+
     return webdriver.Chrome(options=options), temp_dir
 
 def login(driver, user_id, password, start_time):
     print(f"経過時間1: {datetime.datetime.now() - start_time}")
 
-    driver.get(login_url)
+    driver.get(login_url) # 5秒かかる
     print(f"経過時間2: {datetime.datetime.now() - start_time}")
 
     WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.NAME, "id")))
@@ -59,7 +67,8 @@ def login(driver, user_id, password, start_time):
 # スクレポを登録
 def register_screpo(user_id, password, students, index, content):
     try:
-        driver, temp_dir = init()
+        start_time=datetime.datetime.now()
+        driver, temp_dir = init(start_time)
         tree = lxml.html.parse(urlopen(day_schedule_url))
         html_text = lxml.html.tostring(tree, encoding="utf-8").decode()
 
@@ -99,7 +108,7 @@ def students():
     try:
         print(f"ログイン前の時間1: {datetime.datetime.now() - start_time}")
 
-        driver, temp_dir = init()
+        driver, temp_dir = init(start_time)
         print(f"ログイン前の時間2: {datetime.datetime.now() - start_time}")
 
         tree = lxml.html.parse(urlopen(day_schedule_url))
