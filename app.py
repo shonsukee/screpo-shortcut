@@ -28,13 +28,14 @@ def init():
     options.add_argument(f"--user-data-dir={temp_dir}")
     return webdriver.Chrome(options=options), temp_dir
 
-def login(driver, user_id, password):
-    start_time = datetime.datetime.now()
+def login(driver, user_id, password, start_time):
+    print(f"経過時間1: {datetime.datetime.now() - start_time}")
     driver.get(login_url)
     WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.NAME, "id")))
     WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.NAME, "pass")))
     WebDriverWait(driver, 10).until(EC.element_to_be_clickable((By.ID, "LOGIN_SUBMIT_BUTTON")))
 
+    print(f"経過時間2: {datetime.datetime.now() - start_time}")
     # JSで実行
     script = f"""
         document.getElementsByName('id').value = '{user_id}';
@@ -42,8 +43,14 @@ def login(driver, user_id, password):
         document.getElementById('LOGIN_SUBMIT_BUTTON').click();
     """
     driver.execute_script(script)
-    end_time = datetime.datetime.now()
-    print("経過時間: ", end_time - start_time)
+    print(f"経過時間3: {datetime.datetime.now() - start_time}")
+
+    # Cookieの設定
+    cookies = driver.get_cookies()
+    for cookie in cookies:
+        driver.add_cookie(cookie)
+    print(f"経過時間4: {datetime.datetime.now() - start_time}")
+    return driver
 
 # スクレポを登録
 def register_screpo(user_id, password, students, index, content):
@@ -78,20 +85,20 @@ def index():
 # 生徒情報の取得
 @app.route('/students', methods=['POST'])
 def students():
-    start_time = datetime.datetime.now()
-
     # ユーザIDとパスワードを取得
     user_id = request.form.get('user_id')
     password = request.form.get('password')
 
     try:
+        start_time = datetime.datetime.now()
         driver, temp_dir = init()
         tree = lxml.html.parse(urlopen(day_schedule_url))
         html_text = lxml.html.tostring(tree, encoding="utf-8").decode()
+        print(f"ログイン前の時間: {datetime.datetime.now() - start_time}")
 
         # 1. タイムアウトしている場合はログインする
         if "セッション タイムアウト" in html_text:
-            login(driver, user_id, password)
+            driver = login(driver, user_id, password, start_time)
             print(f"再ログインの時間: {datetime.datetime.now() - start_time}")
 
         # 2. 生徒情報ページへ遷移
