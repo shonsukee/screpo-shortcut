@@ -1,6 +1,8 @@
 from flask import Flask, render_template, request
 import json
 import datetime
+import lxml.html
+from urllib.request import urlopen
 from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.chrome.options import Options
@@ -41,85 +43,78 @@ def students():
     temp_dir = mkdtemp()
     options.add_argument(f"--user-data-dir={temp_dir}")
 
-    # 1. ログインする
     try:
-        start_time = datetime.datetime.now()
         driver = webdriver.Chrome(options=options)
-        login(driver, user_id, password)
-        end_time = datetime.datetime.now()
-        print(f"ログインまでの時間{end_time - start_time}")
+        tree = lxml.html.parse(urlopen(day_schedule_url))
+        html_text = lxml.html.tostring(tree, encoding="utf-8").decode()
 
-        # 1-1. セッションタイムアウト時は再度ログインする
-        WebDriverWait(driver, 10).until(
-            EC.presence_of_element_located((By.ID, "MAIN_MENU_TABLE"))
-        )
-        start_time = datetime.datetime.now()
-        page_source = driver.page_source
-        if "セッション タイムアウト" in page_source:
+        # 1. タイムアウトしている場合はログインする
+        if "セッション タイムアウト" in html_text:
+            start_time = datetime.datetime.now()
             login(driver, user_id, password)
             end_time = datetime.datetime.now()
-            print(f"タイムアウト復活までの時間{end_time - start_time}")
+            print(f"再ログインの時間: {end_time - start_time}")
+
+        # 2. 生徒情報ページへ遷移
+        start_time = datetime.datetime.now()
+        driver.get(day_schedule_url)
+        end_time = datetime.datetime.now()
+        print(f"getした時間: {end_time - start_time}")
+
+        # 3. 生徒情報を取得
+        # TODO: 変更！
+        start_time = datetime.datetime.now()
+        message_element = driver.find_element(By.CSS_SELECTOR, "label[for='schedule']")
+        print(f"スクレイピングしたメッセージ: {message_element.text}")
+        end_time = datetime.datetime.now()
+        print(f"スクレイピングまでの時間: {end_time - start_time}")
+
+        students = {
+            "students": [
+                {
+                    "index": 1,
+                    "class_start_time": "17:30",
+                    "name": "清水大河",
+                    "content": "生徒Aのスクレポですわ",
+                    "subject": "数学"
+                },
+                {
+                    "index": 2,
+                    "class_start_time": "17:30",
+                    "name": "佐藤寿也",
+                    "content": "",
+                    "subject": "英語"
+                },
+                {
+                    "index": 3,
+                    "class_start_time": "17:30",
+                    "name": "茂野吾郎",
+                    "content": "生徒Cのスクレポですわ",
+                    "subject": "理科"
+                },
+                {
+                    "index": 4,
+                    "class_start_time": "19:00",
+                    "name": "清水大河",
+                    "content": "生徒Aのスクレポですわ2",
+                    "subject": "数学"
+                }
+            ]
+        }
+
+        driver.quit()
+        # 担当生徒がいる場合
+        if len(students) > 0:
+            return render_template('index.html', user_id=user_id, password=password, data=students)
+        # 担当生徒がいない場合
+        else:
+            return render_template('index.html', user_id=user_id, password=password, data={ "students": [] })
 
     except Exception as e:
         print("例外が発生しました:", str(e))
         if 'driver' in locals():
             driver.quit()
         return render_template('index.html', user_id=user_id, password=password, error="ユーザIDもしくはパスワードが違います", data={ "students": [] })
-
-    start_time = datetime.datetime.now()
-    # 2. 生徒情報ページへ遷移
-    driver.find_element(By.XPATH, "//input[@value='本日の授業']").click()
-    end_time = datetime.datetime.now()
-    print(f"本日の授業の時間{end_time - start_time}")
-
-    # 3. 生徒情報を取得
-    # TODO: 変更！
-    start_time = datetime.datetime.now()
-    message_element = driver.find_element(By.CSS_SELECTOR, "label[for='schedule']")
-    print(f"スクレイピングしたメッセージ: {message_element.text}")
-    end_time = datetime.datetime.now()
-    print(f"スクレイピングまでの時間{end_time - start_time}")
-
-    students = {
-        "students": [
-            {
-                "index": 1,
-                "class_start_time": "17:30",
-                "name": "清水大河",
-                "content": "生徒Aのスクレポですわ",
-                "subject": "数学"
-            },
-            {
-                "index": 2,
-                "class_start_time": "17:30",
-                "name": "佐藤寿也",
-                "content": "",
-                "subject": "英語"
-            },
-            {
-                "index": 3,
-                "class_start_time": "17:30",
-                "name": "茂野吾郎",
-                "content": "生徒Cのスクレポですわ",
-                "subject": "理科"
-            },
-            {
-                "index": 4,
-                "class_start_time": "19:00",
-                "name": "清水大河",
-                "content": "生徒Aのスクレポですわ2",
-                "subject": "数学"
-            }
-        ]
-    }
-    driver.quit()
-
-    # 担当生徒がいる場合
-    if len(students) > 0:
-        return render_template('index.html', user_id=user_id, password=password, data=students)
-    # 担当生徒がいない場合
-    else:
-        return render_template('index.html', user_id=user_id, password=password, data={ "students": [] })
 
 # スクレポの自動登録
 @app.route('/register', methods=['POST'])
