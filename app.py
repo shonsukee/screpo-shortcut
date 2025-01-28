@@ -29,32 +29,21 @@ def init():
     return webdriver.Chrome(options=options), temp_dir
 
 def login(driver, user_id, password):
-    print("---------------------------------")
     start_time = datetime.datetime.now()
-    # 要素全体から検索
-    driver.get(login_url)
-    driver.find_element(By.NAME,"id").send_keys(user_id)
-    driver.find_element(By.NAME,"pass").send_keys(password)
-    driver.find_element(By.ID,"LOGIN_SUBMIT_BUTTON").click()
-    end_time = datetime.datetime.now()
-    print("全体: ", end_time-start_time)
-
-    # JSで実行
     driver.get(login_url)
     WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.NAME, "id")))
     WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.NAME, "pass")))
     WebDriverWait(driver, 10).until(EC.element_to_be_clickable((By.ID, "LOGIN_SUBMIT_BUTTON")))
-    end_timejs = datetime.datetime.now()
-    print("JS before: ", end_timejs-start_time)
 
+    # JSで実行
     script = f"""
         document.getElementsByName('id').value = '{user_id}';
         document.getElementsByName('pass').value = '{password}';
         document.getElementById('LOGIN_SUBMIT_BUTTON').click();
     """
     driver.execute_script(script)
-    end_time1 = datetime.datetime.now()
-    print("JS: ", end_time1-end_timejs)
+    end_time = datetime.datetime.now()
+    print("経過時間: ", end_time - start_time)
 
 # スクレポを登録
 def register_screpo(user_id, password, students, index, content):
