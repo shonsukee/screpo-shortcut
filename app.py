@@ -1,5 +1,6 @@
 from flask import Flask, render_template, request
 import json
+import datetime
 from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.chrome.options import Options
@@ -42,29 +43,42 @@ def students():
 
     # 1. ログインする
     try:
+        start_time = datetime.datetime.now()
         driver = webdriver.Chrome(options=options)
         login(driver, user_id, password)
+        end_time = datetime.datetime.now()
+        print(f"ログインまでの時間{end_time - start_time}")
 
         # 1-1. セッションタイムアウト時は再度ログインする
-        WebDriverWait(driver, 1).until(
+        WebDriverWait(driver, 10).until(
             EC.presence_of_element_located((By.ID, "MAIN_MENU_TABLE"))
         )
+        start_time = datetime.datetime.now()
         page_source = driver.page_source
         if "セッション タイムアウト" in page_source:
             login(driver, user_id, password)
+            end_time = datetime.datetime.now()
+            print(f"タイムアウト復活までの時間{end_time - start_time}")
+
     except Exception as e:
         print("例外が発生しました:", str(e))
         if 'driver' in locals():
             driver.quit()
         return render_template('index.html', user_id=user_id, password=password, error="ユーザIDもしくはパスワードが違います", data={ "students": [] })
 
+    start_time = datetime.datetime.now()
     # 2. 生徒情報ページへ遷移
     driver.find_element(By.XPATH, "//input[@value='本日の授業']").click()
+    end_time = datetime.datetime.now()
+    print(f"本日の授業の時間{end_time - start_time}")
 
     # 3. 生徒情報を取得
     # TODO: 変更！
+    start_time = datetime.datetime.now()
     message_element = driver.find_element(By.CSS_SELECTOR, "label[for='schedule']")
     print(f"スクレイピングしたメッセージ: {message_element.text}")
+    end_time = datetime.datetime.now()
+    print(f"スクレイピングまでの時間{end_time - start_time}")
 
     students = {
         "students": [
