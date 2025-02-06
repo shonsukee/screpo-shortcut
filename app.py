@@ -139,13 +139,13 @@ def register_screpo(user_id, password, students, index, content):
 
 @app.route('/', methods=['GET'])
 def index():
-    return render_template('index.html', error="ログインを行って生徒情報を取得してください", data={ "students": [] })
+    return render_template('index.html', error="ログインして生徒情報を<br>取得してください🕵️‍♀️", data={ "students": [] })
 
 # 生徒情報の取得
 @app.route('/students', methods=['GET', 'POST'])
 def students():
     if request.method == 'GET':
-        return render_template('index.html', error="ログインを行って生徒情報を取得してください", data={ "students": [] })
+        return render_template('index.html', error="ログインして生徒情報を<br>取得してください🕵️‍♀️", data={ "students": [] })
 
     elif request.method == 'POST':
         start_time = datetime.datetime.now()
@@ -154,7 +154,7 @@ def students():
         user_id = request.form.get('user_id') or session.get('user_id')
         password = request.form.get('password') or session.get('password')
         if not user_id or not password:
-            return render_template('index.html', error="ログイン情報が不足しています", data={ "students": [] })
+            return render_template('index.html', error="ログイン情報が不足しています🥺", data={ "students": [] })
         session['user_id'] = user_id
         session['password'] = password
 
@@ -185,7 +185,7 @@ def students():
             for index, row in enumerate(rows):
                 td_elements = row.find_elements(By.TAG_NAME, "td")
                 search_key_pair = search_key_pairs[index]
-                if len(td_elements) >= 4 and len(search_key_pair) >= 2:
+                if len(td_elements) >= 4 and len(search_key_pair) >= 2 and td_elements[6].text == "未入力":
                     # 情報の抽出
                     search_key1 = search_key_pair[0]
                     search_key2 = search_key_pair[1]
@@ -205,15 +205,18 @@ def students():
             print(f"処理の時間: {datetime.datetime.now() - start_time}")
 
             # 担当生徒がいる場合
-            if len(students) > 0:
-                return render_template('index.html', user_id=user_id, data=students)
-            # 担当生徒がいない場合
+            if len(rows) > 0:
+                if len(students["students"]) > 0:
+                    return render_template('index.html', user_id=user_id, data=students)
+                else:
+                    return render_template('index.html', user_id=user_id, error="全て入力済みです！<br>お疲れ様でした🚀", data={ "students": [] })
+            # 授業がない場合
             else:
-                return render_template('index.html', user_id=user_id, data={ "students": [] })
+                return render_template('index.html', user_id=user_id, error="授業はありません💤", data={ "students": [] })
 
         except Exception as e:
             print("例外が発生しました:", str(e))
-            return render_template('index.html', user_id=user_id, error="エラーが発生しました．時間を空けてやり直してください", data={ "students": [] })
+            return render_template('index.html', user_id=user_id, error="エラーが発生しました🥺<br>時間を空けてやり直してください", data={ "students": [] })
 
         finally:
             if 'driver' in locals():
@@ -224,14 +227,14 @@ def students():
 @app.route('/register', methods=['GET', 'POST'])
 def register():
     if request.method == 'GET':
-        return render_template('index.html', error="ログインを行って生徒情報を取得してください", data={ "students": [] })
+        return render_template('index.html', error="ログインして生徒情報を<br>取得してください🕵️‍♀️", data={ "students": [] })
 
     elif request.method == 'POST':
         # ユーザIDとパスワードを取得
         user_id = request.form.get('user_id') or session.get('user_id')
         password = request.form.get('password') or session.get('password')
         if not user_id or not password:
-            return render_template('index.html', error="ログイン情報が不足しています", data={ "students": [] })
+            return render_template('index.html', error="ログイン情報が不足しています🥺", data={ "students": [] })
         session['user_id'] = user_id
         session['password'] = password
 

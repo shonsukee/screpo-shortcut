@@ -49,11 +49,11 @@
         </div>
     {% elif error %}
         <div class="no_student_wrap">
-            <p class="no_student" style="color: #9B003F;">{{ error }}</p>
+            <p class="no_student" style="color: #9B003F;">{{ error | safe }}</p>
         </div>
     {% else %}
         <div class="no_student_wrap">
-            <p class="no_student" style="color:#1f2c5c;">本日の授業はありません</p>
+            <p class="no_student" style="color:#1f2c5c;">授業はありません💤</p>
         </div>
     {% endif %}
 </div>
