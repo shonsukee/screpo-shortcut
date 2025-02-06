@@ -1,4 +1,6 @@
-from flask import Flask, render_template, request
+import os
+from dotenv import load_dotenv
+from flask import Flask, render_template, request, session
 import json
 import datetime
 from threading import Thread
@@ -10,7 +12,11 @@ from selenium.webdriver.support import expected_conditions as EC
 from tempfile import mkdtemp
 import shutil
 
+load_dotenv()
+
 app = Flask(__name__)
+app.config['SECRET_KEY'] = os.getenv('SECRET_KEY')
+app.config['SESSION_COOKIE_NAME'] = os.getenv('SESSION_COOKIE_NAME')
 
 LOGIN_URL = "https://sukurepo.azurewebsites.net/teachers_report/T_report_login"
 DAY_SCHEDULE_URL = "https://sukurepo.azurewebsites.net/teachers_report/t_daySchedule"
@@ -141,8 +147,12 @@ def students():
     start_time = datetime.datetime.now()
 
     # ユーザIDとパスワードを取得
-    user_id = request.form.get('user_id')
-    password = request.form.get('password')
+    user_id = request.form.get('user_id') or session.get('user_id')
+    password = request.form.get('password') or session.get('password')
+    if not user_id or not password:
+        return render_template('index.html', error="ログイン情報が不足しています", data={ "students": [] })
+    session['user_id'] = user_id
+    session['password'] = password
 
     try:
         driver, temp_dir = init()
@@ -192,14 +202,14 @@ def students():
 
         # 担当生徒がいる場合
         if len(students) > 0:
-            return render_template('index.html', user_id=user_id, password=password, data=students)
+            return render_template('index.html', user_id=user_id, data=students)
         # 担当生徒がいない場合
         else:
-            return render_template('index.html', user_id=user_id, password=password, data={ "students": [] })
+            return render_template('index.html', user_id=user_id, data={ "students": [] })
 
     except Exception as e:
         print("例外が発生しました:", str(e))
-        return render_template('index.html', user_id=user_id, password=password, error="ユーザIDもしくはパスワードが違います", data={ "students": [] })
+        return render_template('index.html', user_id=user_id, error="エラーが発生しました．時間を空けてやり直してください", data={ "students": [] })
 
     finally:
         if 'driver' in locals():
@@ -209,9 +219,13 @@ def students():
 # スクレポの自動登録
 @app.route('/register', methods=['POST'])
 def register():
-    # 講師情報を取得
-    user_id = request.form.get('user_id')
-    password = request.form.get('password')
+    # ユーザIDとパスワードを取得
+    user_id = request.form.get('user_id') or session.get('user_id')
+    password = request.form.get('password') or session.get('password')
+    if not user_id or not password:
+        return render_template('index.html', error="ログイン情報が不足しています", data={ "students": [] })
+    session['user_id'] = user_id
+    session['password'] = password
 
     # スクレポ内容を取得
     index = int(request.form.get('index'))
@@ -240,9 +254,9 @@ def register():
     }
 
     if len(students) > 0:
-        return render_template('index.html', user_id=user_id, password=password, data=students)
+        return render_template('index.html', user_id=user_id, data=students)
     else:
-        return render_template('index.html', user_id=user_id, password=password, data={ "students": [] })
+        return render_template('index.html', user_id=user_id, data={ "students": [] })
 
 if __name__ == '__main__':
     app.run(host="0.0.0.0", port=8080, debug=True)

@@ -4,3 +4,4 @@
 /temp/
 pyvenv.cfg
 /__pycache__/
+.env
