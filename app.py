@@ -142,121 +142,129 @@ def index():
     return render_template('index.html', error="ログインを行って生徒情報を取得してください", data={ "students": [] })
 
 # 生徒情報の取得
-@app.route('/students', methods=['POST'])
+@app.route('/students', methods=['GET', 'POST'])
 def students():
-    start_time = datetime.datetime.now()
+    if request.method == 'GET':
+        return render_template('index.html', error="ログインを行って生徒情報を取得してください", data={ "students": [] })
 
-    # ユーザIDとパスワードを取得
-    user_id = request.form.get('user_id') or session.get('user_id')
-    password = request.form.get('password') or session.get('password')
-    if not user_id or not password:
-        return render_template('index.html', error="ログイン情報が不足しています", data={ "students": [] })
-    session['user_id'] = user_id
-    session['password'] = password
+    elif request.method == 'POST':
+        start_time = datetime.datetime.now()
 
-    try:
-        driver, temp_dir = init()
+        # ユーザIDとパスワードを取得
+        user_id = request.form.get('user_id') or session.get('user_id')
+        password = request.form.get('password') or session.get('password')
+        if not user_id or not password:
+            return render_template('index.html', error="ログイン情報が不足しています", data={ "students": [] })
+        session['user_id'] = user_id
+        session['password'] = password
 
-        # # 1. ログイン処理
-        print(f"開始: {datetime.datetime.now() - start_time}")
-        driver = login(driver, user_id, password)
-        print(f"ログインの時間: {datetime.datetime.now() - start_time}")
+        try:
+            driver, temp_dir = init()
 
-        # 2. 生徒情報ページへ遷移
-        # NOTE: 1秒程度かかる
-        driver.get(DAY_SCHEDULE_URL)
-        WebDriverWait(driver, 10).until(
-            EC.presence_of_element_located((By.CSS_SELECTOR, ".slist_table"))
-        )
-        print(f"履歴の時間: {datetime.datetime.now() - start_time}")
+            # # 1. ログイン処理
+            print(f"開始: {datetime.datetime.now() - start_time}")
+            driver = login(driver, user_id, password)
+            print(f"ログインの時間: {datetime.datetime.now() - start_time}")
 
-        # 3. 生徒情報を取得
-        students = { "students": [] }
-        rows = driver.find_elements(By.XPATH, "//tr[@class='slist']")
-        del rows[0]
-        search_keys = driver.execute_script("return Serch_Key;")
-        search_key_pairs = [item.split() for item in search_keys]
+            # 2. 生徒情報ページへ遷移
+            # NOTE: 1秒程度かかる
+            driver.get(DAY_SCHEDULE_URL)
+            WebDriverWait(driver, 10).until(
+                EC.presence_of_element_located((By.CSS_SELECTOR, ".slist_table"))
+            )
+            print(f"履歴の時間: {datetime.datetime.now() - start_time}")
 
-        # 取得結果を出力
-        for index, row in enumerate(rows):
-            td_elements = row.find_elements(By.TAG_NAME, "td")
-            search_key_pair = search_key_pairs[index]
-            if len(td_elements) >= 4 and len(search_key_pair) >= 2:
-                # 情報の抽出
-                search_key1 = search_key_pair[0]
-                search_key2 = search_key_pair[1]
+            # 3. 生徒情報を取得
+            students = { "students": [] }
+            rows = driver.find_elements(By.XPATH, "//tr[@class='slist']")
+            del rows[0]
+            search_keys = driver.execute_script("return Serch_Key;")
+            search_key_pairs = [item.split() for item in search_keys]
 
-                class_start_time = td_elements[2].text.split('～')[0]
-                student_name = td_elements[3].text
-                subject = td_elements[5].text
-                students["students"].append({
-                    "index": index + 1,
-                    "class_start_time": class_start_time,
-                    "name": student_name,
-                    "subject": subject,
-                    "key1": search_key1,
-                    "key2": search_key2,
-                    "key3": 1,
-                })
-        print(f"処理の時間: {datetime.datetime.now() - start_time}")
+            # 取得結果を出力
+            for index, row in enumerate(rows):
+                td_elements = row.find_elements(By.TAG_NAME, "td")
+                search_key_pair = search_key_pairs[index]
+                if len(td_elements) >= 4 and len(search_key_pair) >= 2:
+                    # 情報の抽出
+                    search_key1 = search_key_pair[0]
+                    search_key2 = search_key_pair[1]
 
-        # 担当生徒がいる場合
-        if len(students) > 0:
-            return render_template('index.html', user_id=user_id, data=students)
-        # 担当生徒がいない場合
-        else:
-            return render_template('index.html', user_id=user_id, data={ "students": [] })
+                    class_start_time = td_elements[2].text.split('～')[0]
+                    student_name = td_elements[3].text
+                    subject = td_elements[5].text
+                    students["students"].append({
+                        "index": index + 1,
+                        "class_start_time": class_start_time,
+                        "name": student_name,
+                        "subject": subject,
+                        "key1": search_key1,
+                        "key2": search_key2,
+                        "key3": 1,
+                    })
+            print(f"処理の時間: {datetime.datetime.now() - start_time}")
 
-    except Exception as e:
-        print("例外が発生しました:", str(e))
-        return render_template('index.html', user_id=user_id, error="エラーが発生しました．時間を空けてやり直してください", data={ "students": [] })
+            # 担当生徒がいる場合
+            if len(students) > 0:
+                return render_template('index.html', user_id=user_id, data=students)
+            # 担当生徒がいない場合
+            else:
+                return render_template('index.html', user_id=user_id, data={ "students": [] })
 
-    finally:
-        if 'driver' in locals():
-            driver.quit()
-        shutil.rmtree(temp_dir)
+        except Exception as e:
+            print("例外が発生しました:", str(e))
+            return render_template('index.html', user_id=user_id, error="エラーが発生しました．時間を空けてやり直してください", data={ "students": [] })
+
+        finally:
+            if 'driver' in locals():
+                driver.quit()
+            shutil.rmtree(temp_dir)
 
 # スクレポの自動登録
-@app.route('/register', methods=['POST'])
+@app.route('/register', methods=['GET', 'POST'])
 def register():
-    # ユーザIDとパスワードを取得
-    user_id = request.form.get('user_id') or session.get('user_id')
-    password = request.form.get('password') or session.get('password')
-    if not user_id or not password:
-        return render_template('index.html', error="ログイン情報が不足しています", data={ "students": [] })
-    session['user_id'] = user_id
-    session['password'] = password
+    if request.method == 'GET':
+        return render_template('index.html', error="ログインを行って生徒情報を取得してください", data={ "students": [] })
 
-    # スクレポ内容を取得
-    index = int(request.form.get('index'))
-    content = request.form.get(f'content_{index}')
+    elif request.method == 'POST':
+        # ユーザIDとパスワードを取得
+        user_id = request.form.get('user_id') or session.get('user_id')
+        password = request.form.get('password') or session.get('password')
+        if not user_id or not password:
+            return render_template('index.html', error="ログイン情報が不足しています", data={ "students": [] })
+        session['user_id'] = user_id
+        session['password'] = password
 
-    # 生徒情報を取得
-    students_json = request.form.get('students').replace("'", '"')
-    students = json.loads(students_json)
-    class_start_time = ""
-    name = ""
-    for student in students:
-        if student['index'] == index:
-            class_start_time = student['class_start_time']
-            name = student['name']
-            break
+        # スクレポ内容を取得
+        index = int(request.form.get('index'))
+        content = request.form.get(f'content_{index}')
 
-    thread = Thread(target=lambda: register_screpo(user_id, password, students, index, content))
-    thread.start()
+        # 生徒情報を取得
+        students_json = request.form.get('students').replace("'", '"')
+        students = json.loads(students_json)
+        class_start_time = ""
+        name = ""
+        for student in students:
+            if student['index'] == index:
+                class_start_time = student['class_start_time']
+                name = student['name']
+                break
 
-    # 登録済みの生徒をフィルタリング
-    students = {
-        "students": [
-            student for student in students
-            if not (student["class_start_time"] == class_start_time and student["name"] == name)
-        ]
-    }
+        thread = Thread(target=lambda: register_screpo(user_id, password, students, index, content))
+        thread.start()
 
-    if len(students) > 0:
-        return render_template('index.html', user_id=user_id, data=students)
-    else:
-        return render_template('index.html', user_id=user_id, data={ "students": [] })
+        # 登録済みの生徒をフィルタリング
+        students = {
+            "students": [
+                student for student in students
+                if not (student["class_start_time"] == class_start_time and student["name"] == name)
+            ]
+        }
+
+        if len(students) > 0:
+            return render_template('index.html', user_id=user_id, data=students)
+        else:
+            return render_template('index.html', user_id=user_id, data={ "students": [] })
 
 if __name__ == '__main__':
     app.run(host="0.0.0.0", port=8080, debug=True)
