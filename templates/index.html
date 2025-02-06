@@ -40,9 +40,11 @@
                     ></textarea>
                     <input type="hidden" name="students" value="{{ data['students'] }}">
                     <input type="hidden" name="index" value="{{ student.index }}">
-                    <input type="hidden" name="class_start_time" value="{{ student.class_start_time }}">
                     <input type="hidden" name="user_id" value="{{ user_id }}">
                     <input type="hidden" name="password" value="{{ password }}">
+                    <input type="hidden" name="key1" value="{{ student.key1 }}">
+                    <input type="hidden" name="key2" value="{{ student.key2 }}">
+                    <input type="hidden" name="key3" value="{{ student.key3 }}">
                 </form>
             {% endfor %}
         </div>

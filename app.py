@@ -1,9 +1,7 @@
 from flask import Flask, render_template, request
 import json
 import datetime
-import lxml.html
 from threading import Thread
-from urllib.request import urlopen
 from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.chrome.options import Options
@@ -14,77 +12,119 @@ import shutil
 
 app = Flask(__name__)
 
-login_url = "https://sukurepo.azurewebsites.net/teachers_report/T_report_login"
-target_url = "https://sukurepo.azurewebsites.net/teachers_report/t_menu"
-day_schedule_url = "https://sukurepo.azurewebsites.net/teachers_report/t_daySchedule"
+LOGIN_URL = "https://sukurepo.azurewebsites.net/teachers_report/T_report_login"
+DAY_SCHEDULE_URL = "https://sukurepo.azurewebsites.net/teachers_report/t_daySchedule"
 
-def init(start_time):
+def init():
+    print("---------- init開始 --------------")
+    start_time = datetime.datetime.now()
+    print(f"初期化開始: {start_time}")
+
     options = Options()
-    print(f"init内の時間: {datetime.datetime.now() - start_time}")
     options.add_argument("--headless")
-    print(f"init内の時間1: {datetime.datetime.now() - start_time}")
     options.add_argument("--disable-gpu")
-    print(f"init内の時間2: {datetime.datetime.now() - start_time}")
     options.add_argument("--no-sandbox")
-    print(f"init内の時間3: {datetime.datetime.now() - start_time}")
     options.add_argument("--disable-dev-shm-usage")
-    print(f"init内の時間4: {datetime.datetime.now() - start_time}")
+    options.add_argument('--disable-extensions')
+    options.add_experimental_option("prefs", {
+        "profile.default_content_setting_values.images": 2,
+        "javascript.enabled": False
+    })
+    print(f"オプション設定: {datetime.datetime.now() - start_time}")
 
     temp_dir = mkdtemp()
     options.add_argument(f"--user-data-dir={temp_dir}")
-    print(f"init内の時間5: {datetime.datetime.now() - start_time}")
+    print(f"ディレクトリ作成: {datetime.datetime.now() - start_time}")
 
-    return webdriver.Chrome(options=options), temp_dir
+    # NOTE: 40秒程度かかる
+    driver = webdriver.Chrome(options=options)
+    print(f"ブラウザ初期化: {datetime.datetime.now() - start_time}")
 
-def login(driver, user_id, password, start_time):
-    print(f"経過時間1: {datetime.datetime.now() - start_time}")
+    print("---------- init終了 --------------")
+    return driver, temp_dir
 
-    driver.get(login_url) # 5秒かかる
-    print(f"経過時間2: {datetime.datetime.now() - start_time}")
+def login(driver, user_id, password):
+    print("---------- login開始 --------------")
+    start_time = datetime.datetime.now()
+    print(f"ログイン開始: {start_time}")
+
+    # NOTE: 5秒程度かかる
+    driver.get(LOGIN_URL)
 
     WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.NAME, "id")))
     WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.NAME, "pass")))
     WebDriverWait(driver, 10).until(EC.element_to_be_clickable((By.ID, "LOGIN_SUBMIT_BUTTON")))
-    print(f"経過時間3: {datetime.datetime.now() - start_time}")
+    print(f"ログイン項目待機: {datetime.datetime.now() - start_time}")
 
     # JSで実行
-    script = f"""
-        document.getElementsByName('id').value = '{user_id}';
-        document.getElementsByName('pass').value = '{password}';
-        document.getElementById('LOGIN_SUBMIT_BUTTON').click();
-    """
-    driver.execute_script(script) # 5秒かかる
-    print(f"経過時間4: {datetime.datetime.now() - start_time}")
+    driver.find_element(By.ID, "id").send_keys(user_id)
+    driver.find_element(By.ID, "pass").send_keys(password)
+    driver.find_element(By.ID, "LOGIN_SUBMIT_BUTTON").click()
+    WebDriverWait(driver, 10).until(EC.element_to_be_clickable((By.ID, "BUTTON_SIZE")))
+    print(f"ログイン実行: {datetime.datetime.now() - start_time}")
 
-    # Cookieの設定
-    # cookies = driver.get_cookies()
-    # for cookie in cookies:
-    #     driver.add_cookie(cookie)
-    # print(f"経過時間5: {datetime.datetime.now() - start_time}")
-
+    print("---------- login終了 --------------")
     return driver
 
 # スクレポを登録
 def register_screpo(user_id, password, students, index, content):
     try:
-        start_time=datetime.datetime.now()
-        driver, temp_dir = init(start_time)
-        tree = lxml.html.parse(urlopen(day_schedule_url))
-        html_text = lxml.html.tostring(tree, encoding="utf-8").decode()
+        start_time = datetime.datetime.now()
 
-        # 1. タイムアウトしている場合はログインする
-        if "セッション タイムアウト" in html_text:
-            login(driver, user_id, password)
+        # 1. ログイン処理
+        driver, temp_dir = init()
+        driver = login(driver, user_id, password)
 
-        # TODO: ここで登録処理
-        # driver.get(day_schedule_url + index)
-        script = f"""
-            document.getElementsByName('content').value = '{content}';
-            document.getElementById('SUBMIT_BUTTON').click();
-        """
-        driver.execute_script(script)
-    except Exception:
-        print("エラー発生")
+        # 2. 生徒一覧ページへ遷移
+        driver.get(DAY_SCHEDULE_URL)
+
+        # 3. 生徒個別ページへ遷移
+        key1, key2, key3 = next(
+            ((s["key1"], s["key2"], s["key3"]) for s in students if s["index"] == index),
+            (1, 1, 1)
+        )
+        xpath = f'//button[contains(@onclick, "grid_click( {key1}, {key2}, {key3} );")]'
+        button = WebDriverWait(driver, 10).until(
+            EC.presence_of_element_located((By.XPATH, xpath))
+        )
+        driver.execute_script("arguments[0].scrollIntoView();", button)
+        WebDriverWait(driver, 10).until(
+            EC.element_to_be_clickable((By.XPATH, xpath))
+        )
+        button.click()
+        print("生徒個別ページへ遷移", datetime.datetime.now()-start_time)
+
+        # 4. スクレポ記入
+        WebDriverWait(driver, 10).until(
+            EC.presence_of_element_located((By.ID, "com_teacher"))
+        )
+        # テキストを記入
+        textarea = driver.find_element(By.XPATH, "//textarea[@id='com_teacher']")
+        textarea.clear()
+        textarea.send_keys(content)
+        print("テキスト入力", datetime.datetime.now()-start_time)
+
+        # 登録ボタン押下
+        register_button = WebDriverWait(driver, 10).until(
+            EC.element_to_be_clickable((By.XPATH, "//li[@class='ui-block-d']/a"))
+        )
+        driver.execute_script("arguments[0].scrollIntoView();", register_button)
+        register_button.click()
+        print("登録ボタン押下", datetime.datetime.now()-start_time)
+
+        # 確認ボタン押下
+        WebDriverWait(driver, 10).until(
+            EC.presence_of_element_located((By.ID, "dialog1"))
+        )
+        confirm_button = WebDriverWait(driver, 10).until(
+            EC.element_to_be_clickable((By.XPATH, "//div[@id='dialog1']//button[text()='はい']"))
+        )
+        driver.execute_script("arguments[0].scrollIntoView();", confirm_button)
+        confirm_button.click()
+        print("確認ボタン押下", datetime.datetime.now()-start_time)
+
+    except Exception as e:
+        print("エラー発生", e)
 
     finally:
         if 'driver' in locals():
@@ -103,65 +143,53 @@ def students():
     # ユーザIDとパスワードを取得
     user_id = request.form.get('user_id')
     password = request.form.get('password')
-    print(f"入力処理の時間: {datetime.datetime.now() - start_time}")
 
     try:
-        print(f"ログイン前の時間1: {datetime.datetime.now() - start_time}")
+        driver, temp_dir = init()
 
-        driver, temp_dir = init(start_time)
-        print(f"ログイン前の時間2: {datetime.datetime.now() - start_time}")
-
-        tree = lxml.html.parse(urlopen(day_schedule_url))
-        html_text = lxml.html.tostring(tree, encoding="utf-8").decode()
-        print(f"ログイン前の時間3: {datetime.datetime.now() - start_time}")
-
-        # 1. タイムアウトしている場合はログインする
-        if "セッション タイムアウト" in html_text:
-            print(f"再ログインの時間1: {datetime.datetime.now() - start_time}")
-            driver = login(driver, user_id, password, start_time)
-            print(f"再ログインの時間2: {datetime.datetime.now() - start_time}")
+        # # 1. ログイン処理
+        print(f"開始: {datetime.datetime.now() - start_time}")
+        driver = login(driver, user_id, password)
+        print(f"ログインの時間: {datetime.datetime.now() - start_time}")
 
         # 2. 生徒情報ページへ遷移
-        driver.get(day_schedule_url)
-        print(f"getした時間: {datetime.datetime.now() - start_time}")
+        # NOTE: 1秒程度かかる
+        driver.get(DAY_SCHEDULE_URL)
+        WebDriverWait(driver, 10).until(
+            EC.presence_of_element_located((By.CSS_SELECTOR, ".slist_table"))
+        )
+        print(f"履歴の時間: {datetime.datetime.now() - start_time}")
 
         # 3. 生徒情報を取得
-        # TODO: 変更！
+        students = { "students": [] }
+        rows = driver.find_elements(By.XPATH, "//tr[@class='slist']")
+        del rows[0]
+        search_keys = driver.execute_script("return Serch_Key;")
+        search_key_pairs = [item.split() for item in search_keys]
 
-        students = {
-            "students": [
-                {
-                    "index": 1,
-                    "class_start_time": "17:30",
-                    "name": "清水大河",
-                    "content": "生徒Aのスクレポですわ",
-                    "subject": "数学"
-                },
-                {
-                    "index": 2,
-                    "class_start_time": "17:30",
-                    "name": "佐藤寿也",
-                    "content": "",
-                    "subject": "英語"
-                },
-                {
-                    "index": 3,
-                    "class_start_time": "17:30",
-                    "name": "茂野吾郎",
-                    "content": "生徒Cのスクレポですわ",
-                    "subject": "理科"
-                },
-                {
-                    "index": 4,
-                    "class_start_time": "19:00",
-                    "name": "清水大河",
-                    "content": "生徒Aのスクレポですわ2",
-                    "subject": "数学"
-                }
-            ]
-        }
+        # 取得結果を出力
+        for index, row in enumerate(rows):
+            td_elements = row.find_elements(By.TAG_NAME, "td")
+            search_key_pair = search_key_pairs[index]
+            if len(td_elements) >= 4 and len(search_key_pair) >= 2:
+                # 情報の抽出
+                search_key1 = search_key_pair[0]
+                search_key2 = search_key_pair[1]
 
-        print(f"全体の時間: ", datetime.datetime.now() - start_time)
+                class_start_time = td_elements[2].text.split('～')[0]
+                student_name = td_elements[3].text
+                subject = td_elements[5].text
+                students["students"].append({
+                    "index": index + 1,
+                    "class_start_time": class_start_time,
+                    "name": student_name,
+                    "subject": subject,
+                    "key1": search_key1,
+                    "key2": search_key2,
+                    "key3": 1,
+                })
+        print(f"処理の時間: {datetime.datetime.now() - start_time}")
+
         # 担当生徒がいる場合
         if len(students) > 0:
             return render_template('index.html', user_id=user_id, password=password, data=students)
@@ -181,14 +209,17 @@ def students():
 # スクレポの自動登録
 @app.route('/register', methods=['POST'])
 def register():
+    # 講師情報を取得
     user_id = request.form.get('user_id')
     password = request.form.get('password')
 
-    # 生徒名，開始時間，スクレポ内容を取得
-    students_json = request.form.get('students').replace("'", '"')
-    students = json.loads(students_json)
+    # スクレポ内容を取得
     index = int(request.form.get('index'))
     content = request.form.get(f'content_{index}')
+
+    # 生徒情報を取得
+    students_json = request.form.get('students').replace("'", '"')
+    students = json.loads(students_json)
     class_start_time = ""
     name = ""
     for student in students:
