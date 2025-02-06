@@ -4,11 +4,11 @@
 <div class="container">
     <h1 class="title">スクレポ入力</h1>
     <div class="wrap">
-        <button id="toggle_button">ログイン</button>
+        <button id="toggle_button">ログイン情報入力</button>
         <form action="/students" method="post" class="login">
             <div class="login-row">
                 <label for="user_id" class="login-text">ユーザーID</label>
-                <input type="text" id="user_id" name="user_id" value="{{ user_id }}" required>
+                <input type="number" id="user_id" name="user_id" value="{{ user_id }}" required>
             </div>
             <div class="login-row">
                 <label for="password" class="login-text">パスワード</label>
