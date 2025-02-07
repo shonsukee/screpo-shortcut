@@ -257,17 +257,18 @@ def register():
         thread.start()
 
         # 登録済みの生徒をフィルタリング
-        students = {
+        filtered_students = {
             "students": [
                 student for student in students
                 if not (student["class_start_time"] == class_start_time and student["name"] == name)
             ]
         }
 
-        if len(students) > 0:
-            return render_template('index.html', user_id=user_id, data=students)
+        # 未入力の生徒がいる場合
+        if len(filtered_students["students"]) > 0:
+            return render_template('index.html', user_id=user_id, data=filtered_students)
         else:
-            return render_template('index.html', user_id=user_id, data={ "students": [] })
+            return render_template('index.html', user_id=user_id, error="全て入力済みです！<br>お疲れ様でした🚀", data={ "students": [] })
 
 if __name__ == '__main__':
     app.run(host="0.0.0.0", port=8080, debug=True)
