@@ -12,6 +12,7 @@ from selenium.webdriver.support import expected_conditions as EC
 from tempfile import mkdtemp
 import fcntl
 import threading
+import psutil
 
 load_dotenv()
 
@@ -41,6 +42,16 @@ def release_lock(fd):
     fcntl.flock(fd, fcntl.LOCK_UN)
     fd.close()
 
+def kill_existing_chrome_processes(fixed_dir):
+    print("!!!!!!!!kill_existing_chrome_processes!!!!!!!!")
+    for proc in psutil.process_iter(['pid', 'name', 'cmdline']):
+        try:
+            cmdline = proc.info['cmdline']
+            if cmdline and any(fixed_dir in arg for arg in cmdline if isinstance(arg, str)):
+                proc.kill()
+        except Exception:
+            pass
+
 # WARNING: ブラウザの初期化
 def init_browser():
     print("!!!!!!!!ブラウザの初期化!!!!!!!!")
@@ -56,12 +67,13 @@ def init_browser():
     })
     temp_dir = mkdtemp()
     options.add_argument(f"--user-data-dir={temp_dir}")
-
+    kill_existing_chrome_processes(temp_dir)
     return webdriver.Chrome(options=options)
 
 # ブラウザがNoneの場合のみ実行
 def reset_browser_instance():
     global BROWSER_INSTANCE
+    print("---------- reset_browser_instance --------------")
 
     lock_fd = acquire_lock(LOCK_FILE)
     try:
@@ -75,6 +87,7 @@ def reset_browser_instance():
 # ブラウザの共通インスタンスを取得
 def get_browser_instance():
     global BROWSER_INSTANCE
+    print("---------- get_browser_instance --------------")
 
     with BROWSER_INSTANCE_LOCK:
         if BROWSER_INSTANCE is None:
@@ -99,6 +112,7 @@ worker_thread = threading.Thread(target=browser_worker, daemon=True)
 worker_thread.start()
 
 def process_students(user_id, password):
+    print("---------- process_students --------------")
     try:
         driver = get_browser_instance()
         driver = login(driver, user_id, password)
@@ -304,28 +318,6 @@ def register():
             return render_template('index.html', user_id=user_id, data=filtered_students)
         else:
             return render_template('index.html', user_id=user_id, error="全て入力済みです！<br>お疲れ様でした🚀", data={"students": []})
-
-
-
-
-
-
-        # thread = Thread(target=lambda: register_screpo(user_id, password, students, index, content))
-        # thread.start()
-
-        # # 登録済みの生徒をフィルタリング
-        # filtered_students = {
-        #     "students": [
-        #         student for student in students
-        #         if not (student["class_start_time"] == class_start_time and student["name"] == name)
-        #     ]
-        # }
-
-        # # 未入力の生徒がいる場合
-        # if len(filtered_students["students"]) > 0:
-        #     return render_template('index.html', user_id=user_id, data=filtered_students)
-        # else:
-        #     return render_template('index.html', user_id=user_id, error="全て入力済みです！<br>お疲れ様でした🚀", data={ "students": [] })
 
 if __name__ == '__main__':
     app.run(host="0.0.0.0", port=8080, debug=True)
