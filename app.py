@@ -1,16 +1,17 @@
 import os
+import queue
 from dotenv import load_dotenv
 from flask import Flask, render_template, request, session
 import json
 import datetime
-from threading import Thread
 from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from tempfile import mkdtemp
-import shutil
+import fcntl
+import threading
 
 load_dotenv()
 
@@ -18,36 +19,130 @@ app = Flask(__name__)
 app.config['SECRET_KEY'] = os.getenv('SECRET_KEY')
 app.config['SESSION_COOKIE_NAME'] = os.getenv('SESSION_COOKIE_NAME')
 
+# スクレポURL
 LOGIN_URL = "https://sukurepo.azurewebsites.net/teachers_report/T_report_login"
 DAY_SCHEDULE_URL = "https://sukurepo.azurewebsites.net/teachers_report/t_daySchedule"
 
-def init():
-    print("---------- init開始 --------------")
-    start_time = datetime.datetime.now()
-    print(f"初期化開始: {start_time}")
+# ブラウザの初期化
+FIXED_DIR = '/tmp/chrome-user-data'
+LOCK_FILE = '/tmp/chrome-user-data.lock'
+BROWSER_INSTANCE = None
+BROWSER_INSTANCE_LOCK = threading.Lock()
 
+# タスクキュー
+BROWSER_TASK_QUEUE = queue.Queue()
+
+def acquire_lock(lock_file):
+    fd = open(lock_file, 'w')
+    fcntl.flock(fd, fcntl.LOCK_EX)
+    return fd
+
+def release_lock(fd):
+    fcntl.flock(fd, fcntl.LOCK_UN)
+    fd.close()
+
+# WARNING: ブラウザの初期化
+def init_browser():
+    print("!!!!!!!!ブラウザの初期化!!!!!!!!")
     options = Options()
     options.add_argument("--headless")
     options.add_argument("--disable-gpu")
     options.add_argument("--no-sandbox")
     options.add_argument("--disable-dev-shm-usage")
-    options.add_argument('--disable-extensions')
+    options.add_argument("--disable-extensions")
     options.add_experimental_option("prefs", {
         "profile.default_content_setting_values.images": 2,
         "javascript.enabled": False
     })
-    print(f"オプション設定: {datetime.datetime.now() - start_time}")
-
     temp_dir = mkdtemp()
     options.add_argument(f"--user-data-dir={temp_dir}")
-    print(f"ディレクトリ作成: {datetime.datetime.now() - start_time}")
 
-    # NOTE: 40秒程度かかる
-    driver = webdriver.Chrome(options=options)
-    print(f"ブラウザ初期化: {datetime.datetime.now() - start_time}")
+    return webdriver.Chrome(options=options)
 
-    print("---------- init終了 --------------")
-    return driver, temp_dir
+# ブラウザがNoneの場合のみ実行
+def reset_browser_instance():
+    global BROWSER_INSTANCE
+
+    lock_fd = acquire_lock(LOCK_FILE)
+    try:
+        if BROWSER_INSTANCE is not None:
+            BROWSER_INSTANCE.quit()
+        BROWSER_INSTANCE = init_browser()
+    finally:
+        release_lock(lock_fd)
+    return BROWSER_INSTANCE
+
+# ブラウザの共通インスタンスを取得
+def get_browser_instance():
+    global BROWSER_INSTANCE
+
+    with BROWSER_INSTANCE_LOCK:
+        if BROWSER_INSTANCE is None:
+            BROWSER_INSTANCE = reset_browser_instance()
+
+    return BROWSER_INSTANCE
+
+
+# タスクを順次実行
+def browser_worker():
+    while True:
+        task, result_queue = BROWSER_TASK_QUEUE.get()
+        try:
+            result = task()
+            result_queue.put(result)
+        except Exception as e:
+            result_queue.put(e)
+        finally:
+            BROWSER_TASK_QUEUE.task_done()
+
+worker_thread = threading.Thread(target=browser_worker, daemon=True)
+worker_thread.start()
+
+def process_students(user_id, password):
+    try:
+        driver = get_browser_instance()
+        driver = login(driver, user_id, password)
+
+        # 生徒一覧情報を取得
+        driver.get(DAY_SCHEDULE_URL)
+
+        WebDriverWait(driver, 3).until(
+            EC.presence_of_element_located((By.CSS_SELECTOR, ".slist_table"))
+        )
+        students = {"students": []}
+        rows = driver.find_elements(By.XPATH, "//tr[@class='slist']")
+        del rows[0]
+        search_keys = driver.execute_script("return Serch_Key;")
+        search_key_pairs = [item.split() for item in search_keys]
+
+        for index, row in enumerate(rows):
+            td_elements = row.find_elements(By.TAG_NAME, "td")
+            search_key_pair = search_key_pairs[index]
+            if len(td_elements) >= 4 and len(search_key_pair) >= 2 and td_elements[6].text == "未入力":
+                search_key1 = search_key_pair[0]
+                search_key2 = search_key_pair[1]
+                class_start_time = td_elements[2].text.split('～')[0]
+                student_name = td_elements[3].text
+                subject = td_elements[5].text
+                students["students"].append({
+                    "index": index + 1,
+                    "class_start_time": class_start_time,
+                    "name": student_name,
+                    "subject": subject,
+                    "key1": search_key1,
+                    "key2": search_key2,
+                    "key3": 1,
+                })
+        return students
+    except Exception as e:
+        print("例外が発生しました:", str(e))
+        return e
+
+
+def enqueue_browser_task(task):
+    result_queue = queue.Queue()
+    BROWSER_TASK_QUEUE.put((task, result_queue))
+    return result_queue.get()
 
 def login(driver, user_id, password):
     print("---------- login開始 --------------")
@@ -66,19 +161,21 @@ def login(driver, user_id, password):
     driver.find_element(By.ID, "id").send_keys(user_id)
     driver.find_element(By.ID, "pass").send_keys(password)
     driver.find_element(By.ID, "LOGIN_SUBMIT_BUTTON").click()
-    WebDriverWait(driver, 10).until(EC.element_to_be_clickable((By.ID, "BUTTON_SIZE")))
+    WebDriverWait(
+        driver, 10).until(EC.element_to_be_clickable((By.ID, "BUTTON_SIZE"))
+    )
     print(f"ログイン実行: {datetime.datetime.now() - start_time}")
 
     print("---------- login終了 --------------")
     return driver
 
 # スクレポを登録
-def register_screpo(user_id, password, students, index, content):
+def process_register(user_id, password, students, index, content):
     try:
         start_time = datetime.datetime.now()
 
         # 1. ログイン処理
-        driver, temp_dir = init()
+        driver = get_browser_instance()
         driver = login(driver, user_id, password)
 
         # 2. 生徒一覧ページへ遷移
@@ -132,11 +229,6 @@ def register_screpo(user_id, password, students, index, content):
     except Exception as e:
         print("エラー発生", e)
 
-    finally:
-        if 'driver' in locals():
-            driver.quit()
-        shutil.rmtree(temp_dir)
-
 @app.route('/', methods=['GET'])
 def index():
     return render_template('index.html', error="ログインして生徒情報を<br>取得してください🕵️‍♀️", data={ "students": [] })
@@ -158,70 +250,20 @@ def students():
         session['user_id'] = user_id
         session['password'] = password
 
-        try:
-            driver, temp_dir = init()
+        # 生徒情報取得をキューイング
+        print(f"生徒情報のキューイング: {datetime.datetime.now() - start_time}")
+        result = enqueue_browser_task(lambda: process_students(user_id, password))
+        print(f"生徒情報の処理終了: {datetime.datetime.now() - start_time}")
 
-            # # 1. ログイン処理
-            print(f"開始: {datetime.datetime.now() - start_time}")
-            driver = login(driver, user_id, password)
-            print(f"ログインの時間: {datetime.datetime.now() - start_time}")
+        if isinstance(result, Exception):
+            return render_template('index.html', error="授業はありません💤", data={ "students": [] })
 
-            # 2. 生徒情報ページへ遷移
-            # NOTE: 1秒程度かかる
-            driver.get(DAY_SCHEDULE_URL)
-            WebDriverWait(driver, 10).until(
-                EC.presence_of_element_located((By.CSS_SELECTOR, ".slist_table"))
-            )
-            print(f"履歴の時間: {datetime.datetime.now() - start_time}")
+        # 生徒情報が取得できた場合
+        if len(result["students"]) > 0:
+            return render_template('index.html', user_id=user_id, data=result)
+        else:
+            return render_template('index.html', user_id=user_id, error="全て入力済みです！<br>お疲れ様でした🚀", data={"students": []})
 
-            # 3. 生徒情報を取得
-            students = { "students": [] }
-            rows = driver.find_elements(By.XPATH, "//tr[@class='slist']")
-            del rows[0]
-            search_keys = driver.execute_script("return Serch_Key;")
-            search_key_pairs = [item.split() for item in search_keys]
-
-            # 取得結果を出力
-            for index, row in enumerate(rows):
-                td_elements = row.find_elements(By.TAG_NAME, "td")
-                search_key_pair = search_key_pairs[index]
-                if len(td_elements) >= 4 and len(search_key_pair) >= 2 and td_elements[6].text == "未入力":
-                    # 情報の抽出
-                    search_key1 = search_key_pair[0]
-                    search_key2 = search_key_pair[1]
-
-                    class_start_time = td_elements[2].text.split('～')[0]
-                    student_name = td_elements[3].text
-                    subject = td_elements[5].text
-                    students["students"].append({
-                        "index": index + 1,
-                        "class_start_time": class_start_time,
-                        "name": student_name,
-                        "subject": subject,
-                        "key1": search_key1,
-                        "key2": search_key2,
-                        "key3": 1,
-                    })
-            print(f"処理の時間: {datetime.datetime.now() - start_time}")
-
-            # 担当生徒がいる場合
-            if len(rows) > 0:
-                if len(students["students"]) > 0:
-                    return render_template('index.html', user_id=user_id, data=students)
-                else:
-                    return render_template('index.html', user_id=user_id, error="全て入力済みです！<br>お疲れ様でした🚀", data={ "students": [] })
-            # 授業がない場合
-            else:
-                return render_template('index.html', user_id=user_id, error="授業はありません💤", data={ "students": [] })
-
-        except Exception as e:
-            print("例外が発生しました:", str(e))
-            return render_template('index.html', user_id=user_id, error="エラーが発生しました🥺<br>時間を空けてやり直してください", data={ "students": [] })
-
-        finally:
-            if 'driver' in locals():
-                driver.quit()
-            shutil.rmtree(temp_dir)
 
 # スクレポの自動登録
 @app.route('/register', methods=['GET', 'POST'])
@@ -244,31 +286,46 @@ def register():
 
         # 生徒情報を取得
         students_json = request.form.get('students').replace("'", '"')
-        students = json.loads(students_json)
+        students_data = json.loads(students_json)
         class_start_time = ""
         name = ""
-        for student in students:
+        for student in students_data:
             if student['index'] == index:
                 class_start_time = student['class_start_time']
                 name = student['name']
                 break
 
-        thread = Thread(target=lambda: register_screpo(user_id, password, students, index, content))
+
+        result = enqueue_browser_task(lambda: process_register(user_id, password, students_data, index, content))
+        thread = threading.Thread(target=lambda: result, daemon=True)
         thread.start()
-
-        # 登録済みの生徒をフィルタリング
-        filtered_students = {
-            "students": [
-                student for student in students
-                if not (student["class_start_time"] == class_start_time and student["name"] == name)
-            ]
-        }
-
-        # 未入力の生徒がいる場合
+        filtered_students = {"students": [student for student in students_data if not (student["class_start_time"] == class_start_time and student["name"] == name)]}
         if len(filtered_students["students"]) > 0:
             return render_template('index.html', user_id=user_id, data=filtered_students)
         else:
-            return render_template('index.html', user_id=user_id, error="全て入力済みです！<br>お疲れ様でした🚀", data={ "students": [] })
+            return render_template('index.html', user_id=user_id, error="全て入力済みです！<br>お疲れ様でした🚀", data={"students": []})
+
+
+
+
+
+
+        # thread = Thread(target=lambda: register_screpo(user_id, password, students, index, content))
+        # thread.start()
+
+        # # 登録済みの生徒をフィルタリング
+        # filtered_students = {
+        #     "students": [
+        #         student for student in students
+        #         if not (student["class_start_time"] == class_start_time and student["name"] == name)
+        #     ]
+        # }
+
+        # # 未入力の生徒がいる場合
+        # if len(filtered_students["students"]) > 0:
+        #     return render_template('index.html', user_id=user_id, data=filtered_students)
+        # else:
+        #     return render_template('index.html', user_id=user_id, error="全て入力済みです！<br>お疲れ様でした🚀", data={ "students": [] })
 
 if __name__ == '__main__':
     app.run(host="0.0.0.0", port=8080, debug=True)
