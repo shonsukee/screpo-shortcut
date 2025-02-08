@@ -1,18 +1,17 @@
 import os
-import queue
-from dotenv import load_dotenv
-from flask import Flask, render_template, request, session
 import json
 import datetime
+from dotenv import load_dotenv
+from flask import Flask, render_template, request, session
 from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
+from selenium.common.exceptions import TimeoutException
 from tempfile import mkdtemp
 import fcntl
 import threading
-import psutil
 
 load_dotenv()
 
@@ -25,13 +24,9 @@ LOGIN_URL = "https://sukurepo.azurewebsites.net/teachers_report/T_report_login"
 DAY_SCHEDULE_URL = "https://sukurepo.azurewebsites.net/teachers_report/t_daySchedule"
 
 # ブラウザの初期化
-FIXED_DIR = '/tmp/chrome-user-data'
 LOCK_FILE = '/tmp/chrome-user-data.lock'
 BROWSER_INSTANCE = None
-BROWSER_INSTANCE_LOCK = threading.Lock()
-
-# タスクキュー
-BROWSER_TASK_QUEUE = queue.Queue()
+BROWSER_ACCESS_LOCK = threading.Lock()
 
 def acquire_lock(lock_file):
     fd = open(lock_file, 'w')
@@ -41,16 +36,6 @@ def acquire_lock(lock_file):
 def release_lock(fd):
     fcntl.flock(fd, fcntl.LOCK_UN)
     fd.close()
-
-def kill_existing_chrome_processes(fixed_dir):
-    print("!!!!!!!!kill_existing_chrome_processes!!!!!!!!")
-    for proc in psutil.process_iter(['pid', 'name', 'cmdline']):
-        try:
-            cmdline = proc.info['cmdline']
-            if cmdline and any(fixed_dir in arg for arg in cmdline if isinstance(arg, str)):
-                proc.kill()
-        except Exception:
-            pass
 
 # WARNING: ブラウザの初期化
 def init_browser():
@@ -67,13 +52,12 @@ def init_browser():
     })
     temp_dir = mkdtemp()
     options.add_argument(f"--user-data-dir={temp_dir}")
-    kill_existing_chrome_processes(temp_dir)
+
     return webdriver.Chrome(options=options)
 
 # ブラウザがNoneの場合のみ実行
 def reset_browser_instance():
     global BROWSER_INSTANCE
-    print("---------- reset_browser_instance --------------")
 
     lock_fd = acquire_lock(LOCK_FILE)
     try:
@@ -87,161 +71,162 @@ def reset_browser_instance():
 # ブラウザの共通インスタンスを取得
 def get_browser_instance():
     global BROWSER_INSTANCE
-    print("---------- get_browser_instance --------------")
 
-    with BROWSER_INSTANCE_LOCK:
-        if BROWSER_INSTANCE is None:
-            BROWSER_INSTANCE = reset_browser_instance()
+    if BROWSER_INSTANCE is None:
+        BROWSER_INSTANCE = reset_browser_instance()
 
     return BROWSER_INSTANCE
 
-
-# タスクを順次実行
-def browser_worker():
-    while True:
-        task, result_queue = BROWSER_TASK_QUEUE.get()
-        try:
-            result = task()
-            result_queue.put(result)
-        except Exception as e:
-            result_queue.put(e)
-        finally:
-            BROWSER_TASK_QUEUE.task_done()
-
-worker_thread = threading.Thread(target=browser_worker, daemon=True)
-worker_thread.start()
-
+# 生徒情報の取得
 def process_students(user_id, password):
-    print("---------- process_students --------------")
+    with BROWSER_ACCESS_LOCK:
+        try:
+            driver = get_browser_instance()
+            driver = login(driver, user_id, password)
+            if isinstance(driver, Exception):
+                return
+
+            # 生徒一覧情報を取得
+            driver.get(DAY_SCHEDULE_URL)
+
+            WebDriverWait(driver, 3).until(
+                EC.presence_of_element_located((By.CSS_SELECTOR, ".slist_table"))
+            )
+            students = {"students": []}
+            rows = driver.find_elements(By.XPATH, "//tr[@class='slist']")
+            if len(rows) == 0:
+                return students
+
+            del rows[0]
+            search_keys = driver.execute_script("return Serch_Key;")
+            search_key_pairs = [item.split() for item in search_keys]
+
+            for index, row in enumerate(rows):
+                td_elements = row.find_elements(By.TAG_NAME, "td")
+                search_key_pair = search_key_pairs[index]
+                if len(td_elements) >= 4 and len(search_key_pair) >= 2 and td_elements[6].text == "未入力":
+                    search_key1 = search_key_pair[0]
+                    search_key2 = search_key_pair[1]
+                    class_start_time = td_elements[2].text.split('～')[0]
+                    student_name = td_elements[3].text
+                    subject = td_elements[5].text
+                    students["students"].append({
+                        "index": index + 1,
+                        "class_start_time": class_start_time,
+                        "name": student_name,
+                        "subject": subject,
+                        "key1": search_key1,
+                        "key2": search_key2,
+                        "key3": 1,
+                    })
+            return students
+        except TimeoutException as e:
+            print("授業がありませんでした...", type(e).__name__)
+            return e
+        except Exception as e:
+            print("例外が発生しました:",  type(e).__name__, str(e))
+            return e
+
+# ログイン処理
+def login(driver, user_id, password):
     try:
-        driver = get_browser_instance()
-        driver = login(driver, user_id, password)
+        print("---------- login開始 --------------")
+        start_time = datetime.datetime.now()
+        print(f"ログイン開始: {start_time}")
 
-        # 生徒一覧情報を取得
-        driver.get(DAY_SCHEDULE_URL)
+        # NOTE: 5秒程度かかる
+        driver.get(LOGIN_URL)
 
-        WebDriverWait(driver, 3).until(
-            EC.presence_of_element_located((By.CSS_SELECTOR, ".slist_table"))
+        WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.NAME, "id")))
+        WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.NAME, "pass")))
+        WebDriverWait(driver, 10).until(EC.element_to_be_clickable((By.ID, "LOGIN_SUBMIT_BUTTON")))
+        print(f"ログイン項目待機: {datetime.datetime.now() - start_time}")
+
+        # JSで実行
+        driver.find_element(By.ID, "id").send_keys(user_id)
+        driver.find_element(By.ID, "pass").send_keys(password)
+        driver.find_element(By.ID, "LOGIN_SUBMIT_BUTTON").click()
+        WebDriverWait(
+            driver, 10).until(EC.element_to_be_clickable((By.ID, "BUTTON_SIZE"))
         )
-        students = {"students": []}
-        rows = driver.find_elements(By.XPATH, "//tr[@class='slist']")
-        del rows[0]
-        search_keys = driver.execute_script("return Serch_Key;")
-        search_key_pairs = [item.split() for item in search_keys]
+        print(f"ログイン実行: {datetime.datetime.now() - start_time}")
 
-        for index, row in enumerate(rows):
-            td_elements = row.find_elements(By.TAG_NAME, "td")
-            search_key_pair = search_key_pairs[index]
-            if len(td_elements) >= 4 and len(search_key_pair) >= 2 and td_elements[6].text == "未入力":
-                search_key1 = search_key_pair[0]
-                search_key2 = search_key_pair[1]
-                class_start_time = td_elements[2].text.split('～')[0]
-                student_name = td_elements[3].text
-                subject = td_elements[5].text
-                students["students"].append({
-                    "index": index + 1,
-                    "class_start_time": class_start_time,
-                    "name": student_name,
-                    "subject": subject,
-                    "key1": search_key1,
-                    "key2": search_key2,
-                    "key3": 1,
-                })
-        return students
-    except Exception as e:
-        print("例外が発生しました:", str(e))
+        print("---------- login終了 --------------")
+        return driver
+
+    except TimeoutException as e:
+        print("ログイン画面がタイムアウトしました...", type(e).__name__)
         return e
 
-
-def enqueue_browser_task(task):
-    result_queue = queue.Queue()
-    BROWSER_TASK_QUEUE.put((task, result_queue))
-    return result_queue.get()
-
-def login(driver, user_id, password):
-    print("---------- login開始 --------------")
-    start_time = datetime.datetime.now()
-    print(f"ログイン開始: {start_time}")
-
-    # NOTE: 5秒程度かかる
-    driver.get(LOGIN_URL)
-
-    WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.NAME, "id")))
-    WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.NAME, "pass")))
-    WebDriverWait(driver, 10).until(EC.element_to_be_clickable((By.ID, "LOGIN_SUBMIT_BUTTON")))
-    print(f"ログイン項目待機: {datetime.datetime.now() - start_time}")
-
-    # JSで実行
-    driver.find_element(By.ID, "id").send_keys(user_id)
-    driver.find_element(By.ID, "pass").send_keys(password)
-    driver.find_element(By.ID, "LOGIN_SUBMIT_BUTTON").click()
-    WebDriverWait(
-        driver, 10).until(EC.element_to_be_clickable((By.ID, "BUTTON_SIZE"))
-    )
-    print(f"ログイン実行: {datetime.datetime.now() - start_time}")
-
-    print("---------- login終了 --------------")
-    return driver
+    except Exception as e:
+        print("ログインエラーが発生しました: ", type(e).__name__, str(e))
+        return e
 
 # スクレポを登録
 def process_register(user_id, password, students, index, content):
-    try:
-        start_time = datetime.datetime.now()
+    with BROWSER_ACCESS_LOCK:
+        try:
+            start_time = datetime.datetime.now()
 
-        # 1. ログイン処理
-        driver = get_browser_instance()
-        driver = login(driver, user_id, password)
+            # 1. ログイン処理
+            driver = get_browser_instance()
+            driver = login(driver, user_id, password)
+            if isinstance(driver, Exception):
+                return
 
-        # 2. 生徒一覧ページへ遷移
-        driver.get(DAY_SCHEDULE_URL)
+            # 2. 生徒一覧ページへ遷移
+            driver.get(DAY_SCHEDULE_URL)
 
-        # 3. 生徒個別ページへ遷移
-        key1, key2, key3 = next(
-            ((s["key1"], s["key2"], s["key3"]) for s in students if s["index"] == index),
-            (1, 1, 1)
-        )
-        xpath = f'//button[contains(@onclick, "grid_click( {key1}, {key2}, {key3} );")]'
-        button = WebDriverWait(driver, 10).until(
-            EC.presence_of_element_located((By.XPATH, xpath))
-        )
-        driver.execute_script("arguments[0].scrollIntoView();", button)
-        WebDriverWait(driver, 10).until(
-            EC.element_to_be_clickable((By.XPATH, xpath))
-        )
-        button.click()
-        print("生徒個別ページへ遷移", datetime.datetime.now()-start_time)
+            # 3. 生徒個別ページへ遷移
+            key1, key2, key3 = next(
+                ((s["key1"], s["key2"], s["key3"]) for s in students if s["index"] == index),
+                (1, 1, 1)
+            )
+            xpath = f'//button[contains(@onclick, "grid_click( {key1}, {key2}, {key3} );")]'
+            button = WebDriverWait(driver, 10).until(
+                EC.presence_of_element_located((By.XPATH, xpath))
+            )
+            driver.execute_script("arguments[0].scrollIntoView();", button)
+            WebDriverWait(driver, 10).until(
+                EC.element_to_be_clickable((By.XPATH, xpath))
+            )
+            button.click()
+            print("生徒個別ページへ遷移", datetime.datetime.now()-start_time)
 
-        # 4. スクレポ記入
-        WebDriverWait(driver, 10).until(
-            EC.presence_of_element_located((By.ID, "com_teacher"))
-        )
-        # テキストを記入
-        textarea = driver.find_element(By.XPATH, "//textarea[@id='com_teacher']")
-        textarea.clear()
-        textarea.send_keys(content)
-        print("テキスト入力", datetime.datetime.now()-start_time)
+            # 4. スクレポ記入
+            WebDriverWait(driver, 10).until(
+                EC.presence_of_element_located((By.ID, "com_teacher"))
+            )
+            # テキストを記入
+            textarea = driver.find_element(By.XPATH, "//textarea[@id='com_teacher']")
+            textarea.clear()
+            textarea.send_keys(content)
+            print("テキスト入力", datetime.datetime.now()-start_time)
 
-        # 登録ボタン押下
-        register_button = WebDriverWait(driver, 10).until(
-            EC.element_to_be_clickable((By.XPATH, "//li[@class='ui-block-d']/a"))
-        )
-        driver.execute_script("arguments[0].scrollIntoView();", register_button)
-        register_button.click()
-        print("登録ボタン押下", datetime.datetime.now()-start_time)
+            # 登録ボタン押下
+            register_button = WebDriverWait(driver, 10).until(
+                EC.element_to_be_clickable((By.XPATH, "//li[@class='ui-block-d']/a"))
+            )
+            driver.execute_script("arguments[0].scrollIntoView();", register_button)
+            register_button.click()
+            print("登録ボタン押下", datetime.datetime.now()-start_time)
 
-        # 確認ボタン押下
-        WebDriverWait(driver, 10).until(
-            EC.presence_of_element_located((By.ID, "dialog1"))
-        )
-        confirm_button = WebDriverWait(driver, 10).until(
-            EC.element_to_be_clickable((By.XPATH, "//div[@id='dialog1']//button[text()='はい']"))
-        )
-        driver.execute_script("arguments[0].scrollIntoView();", confirm_button)
-        confirm_button.click()
-        print("確認ボタン押下", datetime.datetime.now()-start_time)
+            # 確認ボタン押下
+            WebDriverWait(driver, 10).until(
+                EC.presence_of_element_located((By.ID, "dialog1"))
+            )
+            confirm_button = WebDriverWait(driver, 10).until(
+                EC.element_to_be_clickable((By.XPATH, "//div[@id='dialog1']//button[text()='はい']"))
+            )
+            driver.execute_script("arguments[0].scrollIntoView();", confirm_button)
+            confirm_button.click()
+            print("確認ボタン押下", datetime.datetime.now()-start_time)
 
-    except Exception as e:
-        print("エラー発生", e)
+        except TimeoutException as e:
+            print("授業がありませんでした...", type(e).__name__)
+
+        except Exception as e:
+            print("エラー発生", type(e).__name__, str(e))
 
 @app.route('/', methods=['GET'])
 def index():
@@ -265,8 +250,8 @@ def students():
         session['password'] = password
 
         # 生徒情報取得をキューイング
-        print(f"生徒情報のキューイング: {datetime.datetime.now() - start_time}")
-        result = enqueue_browser_task(lambda: process_students(user_id, password))
+        print(f"生徒情報の処理実行: {datetime.datetime.now() - start_time}")
+        result = process_students(user_id, password)
         print(f"生徒情報の処理終了: {datetime.datetime.now() - start_time}")
 
         if isinstance(result, Exception):
@@ -309,9 +294,7 @@ def register():
                 name = student['name']
                 break
 
-
-        result = enqueue_browser_task(lambda: process_register(user_id, password, students_data, index, content))
-        thread = threading.Thread(target=lambda: result, daemon=True)
+        thread = threading.Thread(target=process_register, args=[user_id, password, students_data, index, content], daemon=True)
         thread.start()
         filtered_students = {"students": [student for student in students_data if not (student["class_start_time"] == class_start_time and student["name"] == name)]}
         if len(filtered_students["students"]) > 0:
