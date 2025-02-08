@@ -219,12 +219,13 @@ def process_register(user_id, password, students, index, content):
             driver.execute_script("arguments[0].scrollIntoView();", confirm_button)
             confirm_button.click()
             print("確認ボタン押下", datetime.datetime.now()-start_time)
+            print("****** スクレポ登録終了 ******")
 
         except TimeoutException as e:
-            print("授業がありませんでした...", type(e).__name__)
+            print("****** 授業がありませんでした ******", type(e).__name__)
 
         except Exception as e:
-            print("エラー発生", type(e).__name__, str(e))
+            print("****** エラー発生 ******", type(e).__name__, str(e))
 
 @app.route('/', methods=['GET'])
 def index():
@@ -237,6 +238,7 @@ def students():
         return render_template('index.html', error="ログインして生徒情報を<br>取得してください🕵️‍♀️", data={ "students": [] })
 
     elif request.method == 'POST':
+        print("****** 生徒情報取得開始 ******")
         start_time = datetime.datetime.now()
 
         # ユーザIDとパスワードを取得
@@ -255,6 +257,7 @@ def students():
         if isinstance(result, Exception):
             return render_template('index.html', error="授業はありません💤", data={ "students": [] })
 
+        print("****** 生徒情報取得終了 ******")
         # 生徒情報が取得できた場合
         if len(result["students"]) > 0:
             return render_template('index.html', user_id=user_id, data=result)
@@ -269,6 +272,8 @@ def register():
         return render_template('index.html', error="ログインして生徒情報を<br>取得してください🕵️‍♀️", data={ "students": [] })
 
     elif request.method == 'POST':
+        print("****** スクレポ登録開始 ******")
+
         # ユーザIDとパスワードを取得
         user_id = request.form.get('user_id') or session.get('user_id')
         password = request.form.get('password') or session.get('password')
