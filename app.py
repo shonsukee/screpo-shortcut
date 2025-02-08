@@ -89,7 +89,7 @@ def process_students(user_id, password):
             # 生徒一覧情報を取得
             driver.get(DAY_SCHEDULE_URL)
 
-            WebDriverWait(driver, 3).until(
+            WebDriverWait(driver, 2).until(
                 EC.presence_of_element_located((By.CSS_SELECTOR, ".slist_table"))
             )
             students = {"students": []}
@@ -137,18 +137,16 @@ def login(driver, user_id, password):
         # NOTE: 5秒程度かかる
         driver.get(LOGIN_URL)
 
-        WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.NAME, "id")))
-        WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.NAME, "pass")))
-        WebDriverWait(driver, 10).until(EC.element_to_be_clickable((By.ID, "LOGIN_SUBMIT_BUTTON")))
+        WebDriverWait(driver, 2).until(EC.presence_of_element_located((By.NAME, "id")))
+        WebDriverWait(driver, 2).until(EC.presence_of_element_located((By.NAME, "pass")))
+        WebDriverWait(driver, 2).until(EC.element_to_be_clickable((By.ID, "LOGIN_SUBMIT_BUTTON")))
         print(f"ログイン項目待機: {datetime.datetime.now() - start_time}")
 
         # JSで実行
         driver.find_element(By.ID, "id").send_keys(user_id)
         driver.find_element(By.ID, "pass").send_keys(password)
         driver.find_element(By.ID, "LOGIN_SUBMIT_BUTTON").click()
-        WebDriverWait(
-            driver, 10).until(EC.element_to_be_clickable((By.ID, "BUTTON_SIZE"))
-        )
+        WebDriverWait(driver, 2).until(EC.element_to_be_clickable((By.ID, "BUTTON_SIZE")))
         print(f"ログイン実行: {datetime.datetime.now() - start_time}")
 
         print("---------- login終了 --------------")
@@ -183,18 +181,18 @@ def process_register(user_id, password, students, index, content):
                 (1, 1, 1)
             )
             xpath = f'//button[contains(@onclick, "grid_click( {key1}, {key2}, {key3} );")]'
-            button = WebDriverWait(driver, 10).until(
+            button = WebDriverWait(driver, 2).until(
                 EC.presence_of_element_located((By.XPATH, xpath))
             )
             driver.execute_script("arguments[0].scrollIntoView();", button)
-            WebDriverWait(driver, 10).until(
+            WebDriverWait(driver, 2).until(
                 EC.element_to_be_clickable((By.XPATH, xpath))
             )
             button.click()
             print("生徒個別ページへ遷移", datetime.datetime.now()-start_time)
 
             # 4. スクレポ記入
-            WebDriverWait(driver, 10).until(
+            WebDriverWait(driver, 2).until(
                 EC.presence_of_element_located((By.ID, "com_teacher"))
             )
             # テキストを記入
@@ -204,7 +202,7 @@ def process_register(user_id, password, students, index, content):
             print("テキスト入力", datetime.datetime.now()-start_time)
 
             # 登録ボタン押下
-            register_button = WebDriverWait(driver, 10).until(
+            register_button = WebDriverWait(driver, 2).until(
                 EC.element_to_be_clickable((By.XPATH, "//li[@class='ui-block-d']/a"))
             )
             driver.execute_script("arguments[0].scrollIntoView();", register_button)
@@ -212,10 +210,10 @@ def process_register(user_id, password, students, index, content):
             print("登録ボタン押下", datetime.datetime.now()-start_time)
 
             # 確認ボタン押下
-            WebDriverWait(driver, 10).until(
+            WebDriverWait(driver, 2).until(
                 EC.presence_of_element_located((By.ID, "dialog1"))
             )
-            confirm_button = WebDriverWait(driver, 10).until(
+            confirm_button = WebDriverWait(driver, 2).until(
                 EC.element_to_be_clickable((By.XPATH, "//div[@id='dialog1']//button[text()='はい']"))
             )
             driver.execute_script("arguments[0].scrollIntoView();", confirm_button)
