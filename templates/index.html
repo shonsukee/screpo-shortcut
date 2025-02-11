@@ -70,6 +70,14 @@
         }
     });
 
+    // ボタンの一時無効化
+    document.querySelector(".login").addEventListener("submit", function() {
+        const button = document.getElementById("fetch_student_info");
+        button.setAttribute("disabled", true);
+        button.setAttribute('aria-disabled', true);
+        button.textContent = "取得中...";
+    });
+
     // 講師用ログインIDの保存
     document.getElementById("fetch_student_info").addEventListener("click", function() {
         const user_id = document.getElementById("user_id").value;
