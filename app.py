@@ -254,6 +254,8 @@ def students():
         result = process_students(user_id, password)
         print(f"生徒情報の処理終了: {datetime.datetime.now() - start_time}")
 
+        if result is None:
+            return render_template('index.html', error="もう一度試してください🙇", data={ "students": [] })
         if isinstance(result, Exception):
             return render_template('index.html', error="授業はありません💤", data={ "students": [] })
 
