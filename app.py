@@ -260,7 +260,7 @@ def students():
         print("****** 生徒情報取得終了 ******")
         # 生徒情報が取得できた場合
         if len(result["students"]) > 0:
-            return render_template('index.html', user_id=user_id, data=result)
+            return render_template('students.html', user_id=user_id, data=result)
         else:
             return render_template('index.html', user_id=user_id, error="全て入力済みです！<br>お疲れ様でした🚀", data={"students": []})
 
@@ -301,7 +301,7 @@ def register():
         thread.start()
         filtered_students = {"students": [student for student in students_data if not (student["class_start_time"] == class_start_time and student["name"] == name)]}
         if len(filtered_students["students"]) > 0:
-            return render_template('index.html', user_id=user_id, data=filtered_students)
+            return render_template('students.html', user_id=user_id, data=filtered_students)
         else:
             return render_template('index.html', user_id=user_id, error="全て入力済みです！<br>お疲れ様でした🚀", data={"students": []})
 

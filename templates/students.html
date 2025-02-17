@@ -1,0 +1,93 @@
+{% extends "layout.html" %}
+
+{% block content %}
+<div class="container">
+    <h1 class="title">スクレポ入力</h1>
+    <div class="wrap">
+        <a href="/"><button type="button" id="toggle_button">ホームへ戻る</button></a>
+    </div>
+
+    {% if data and data['students'] | length > 0 %}
+        <div class="students_wrap">
+            {% for student in data["students"] %}
+                <form action="/register" method="post">
+                    <div class="content">
+                        <div class="student_name">
+                            <label for="student_{{ student.index }}">{{student.class_start_time}}〜【{{ student.subject }}】{{ student.name }}</label>
+                        </div>
+                        <button type="submit" class="register_button">登録</button>
+                    </div>
+
+                    <textarea
+                        name="content_{{ student.index }}"
+                        class="student_comment"
+                        id="content_{{ student.index }}"
+                        cols="30"
+                        rows="5"
+                        placeholder="スクレポを入力"
+                        oninput="saveText(this.id, this.value)"
+                    ></textarea>
+                    <input type="hidden" name="students" value="{{ data['students'] }}">
+                    <input type="hidden" name="index" value="{{ student.index }}">
+                    <input type="hidden" name="user_id" value="{{ user_id }}">
+                    <input type="hidden" name="key1" value="{{ student.key1 }}">
+                    <input type="hidden" name="key2" value="{{ student.key2 }}">
+                    <input type="hidden" name="key3" value="{{ student.key3 }}">
+                </form>
+            {% endfor %}
+        </div>
+    {% elif error %}
+        <div class="no_student_wrap">
+            <p class="no_student" style="color: #9B003F;">{{ error | safe }}</p>
+        </div>
+    {% else %}
+        <div class="no_student_wrap">
+            <p class="no_student" style="color:#1f2c5c;">授業はありません💤</p>
+        </div>
+    {% endif %}
+</div>
+
+<script>
+    // 日付が変わるとローカルストレージを初期化
+    window.addEventListener("load", function() {
+        const today = new Date().toLocaleDateString();
+        const lastAccessDate = localStorage.getItem("last_access_date");
+
+        if (!lastAccessDate || lastAccessDate !== today) {
+            const user_id = localStorage.getItem("user_id");
+            localStorage.clear();
+
+            if (user_id) {
+                localStorage.setItem("user_id", user_id);
+            }
+            localStorage.setItem("last_access_date", today);
+        }
+    });
+
+    // 未登録のスクレポを一時保存
+    function saveText(student_id, text) {
+        localStorage.setItem(student_id, text);
+    }
+
+    // スクレポをテキストボックスに格納
+    window.addEventListener("load", function() {
+        const students = JSON.parse('{{ data["students"] | tojson | safe }}');
+        students.forEach(student => {
+            const student_id = "content_" + student.index;
+
+            let content = "";
+            // 登録済みの場合
+            if (student.content) {
+                content = student.content;
+                localStorage.setItem(student_id, content);
+            }
+            // 未登録の場合
+            else {
+                content = localStorage.getItem(student_id);
+            }
+
+            document.getElementById(student_id).value = content;
+        });
+    });
+</script>
+{% endblock %}
