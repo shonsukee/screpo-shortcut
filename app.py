@@ -235,7 +235,7 @@ def index():
 @app.route('/students', methods=['GET', 'POST'])
 def students():
     if request.method == 'GET':
-        return render_template('index.html', error="ログインして生徒情報を<br>取得してください🕵️‍♀️", data={ "students": [] })
+        return render_template('students.html', error="ホーム画面から<br>ログインしてください🙇", data={ "students": [] })
 
     elif request.method == 'POST':
         print("****** 生徒情報取得開始 ******")
@@ -245,7 +245,7 @@ def students():
         user_id = request.form.get('user_id') or session.get('user_id')
         password = request.form.get('password') or session.get('password')
         if not user_id or not password:
-            return render_template('index.html', error="ログイン情報が不足しています🥺", data={ "students": [] })
+            return render_template('students.html', error="ログイン情報が不足しています🥺", data={ "students": [] })
         session['user_id'] = user_id
         session['password'] = password
 
@@ -255,23 +255,23 @@ def students():
         print(f"生徒情報の処理終了: {datetime.datetime.now() - start_time}")
 
         if result is None:
-            return render_template('index.html', error="もう一度試してください🙇", data={ "students": [] })
+            return render_template('students.html', error="もう一度試してください🙇", data={ "students": [] })
         if isinstance(result, Exception):
-            return render_template('index.html', error="授業はありません💤", data={ "students": [] })
+            return render_template('students.html', error="授業はありません💤", data={ "students": [] })
 
         print("****** 生徒情報取得終了 ******")
         # 生徒情報が取得できた場合
         if len(result["students"]) > 0:
             return render_template('students.html', user_id=user_id, data=result)
         else:
-            return render_template('index.html', user_id=user_id, error="全て入力済みです！<br>お疲れ様でした🚀", data={"students": []})
+            return render_template('students.html', user_id=user_id, error="全て入力済みです！<br>お疲れ様でした🚀", data={"students": []})
 
 
 # スクレポの自動登録
 @app.route('/register', methods=['GET', 'POST'])
 def register():
     if request.method == 'GET':
-        return render_template('index.html', error="ログインして生徒情報を<br>取得してください🕵️‍♀️", data={ "students": [] })
+        return render_template('students.html', error="ホーム画面から<br>ログインしてください🙇", data={ "students": [] })
 
     elif request.method == 'POST':
         print("****** スクレポ登録開始 ******")
@@ -280,7 +280,7 @@ def register():
         user_id = request.form.get('user_id') or session.get('user_id')
         password = request.form.get('password') or session.get('password')
         if not user_id or not password:
-            return render_template('index.html', error="ログイン情報が不足しています🥺", data={ "students": [] })
+            return render_template('students.html', error="ログイン情報が不足しています🥺", data={ "students": [] })
         session['user_id'] = user_id
         session['password'] = password
 
@@ -305,7 +305,7 @@ def register():
         if len(filtered_students["students"]) > 0:
             return render_template('students.html', user_id=user_id, data=filtered_students)
         else:
-            return render_template('index.html', user_id=user_id, error="全て入力済みです！<br>お疲れ様でした🚀", data={"students": []})
+            return render_template('students.html', user_id=user_id, error="全て入力済みです！<br>お疲れ様でした🚀", data={"students": []})
 
 if __name__ == '__main__':
     app.run(host="0.0.0.0", port=8080, debug=True)

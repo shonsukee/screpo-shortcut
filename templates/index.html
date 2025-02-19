@@ -8,11 +8,11 @@
         <form action="/students" method="post" class="login">
             <div class="login-row">
                 <label for="user_id" class="login-text">ユーザーID</label>
-                <input type="number" id="user_id" name="user_id" value="{{ user_id }}" required>
+                <input type="text" inputmode="numeric" id="user_id" name="user_id" value="{{ user_id }}" required>
             </div>
             <div class="login-row">
                 <label for="password" class="login-text">パスワード</label>
-                <input type="password" id="password" name="password">
+                <input type="password" inputmode="numeric" id="password" name="password">
             </div>
             <button type="submit" id="fetch_student_info">生徒情報取得</button>
         </form>
