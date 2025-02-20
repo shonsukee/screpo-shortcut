@@ -229,7 +229,7 @@ def process_register(user_id, password, students, index, content):
 
 @app.route('/', methods=['GET'])
 def index():
-    return render_template('index.html', error="ログインして生徒情報を<br>取得してください🕵️‍♀️", data={ "students": [] })
+    return render_template('index.html', error="ログインして生徒情報を<br>取得してください<a href='/demo'>🕵️‍♀️</a>", data={ "students": [] })
 
 # 生徒情報の取得
 @app.route('/students', methods=['GET', 'POST'])
@@ -306,6 +306,79 @@ def register():
             return render_template('students.html', user_id=user_id, data=filtered_students)
         else:
             return render_template('students.html', user_id=user_id, error="全て入力済みです！<br>お疲れ様でした🚀", data={"students": []})
+
+# 【デモ】スクレポの自動登録
+@app.route('/demo_register', methods=['GET', 'POST'])
+def demo_register():
+    if request.method == 'GET':
+        return render_template('demo_students.html', error="ホーム画面から<br>ログインしてください🙇", data={ "students": [] })
+
+    elif request.method == 'POST':
+        print("****** スクレポ[デモ]登録開始 ******")
+
+
+        # 生徒情報を取得
+        students_json = request.form.get('students').replace("'", '"')
+        students_data = json.loads(students_json)
+        index = int(request.form.get('index'))
+        class_start_time = ""
+        name = ""
+        for student in students_data:
+            if student['index'] == index:
+                class_start_time = student['class_start_time']
+                name = student['name']
+                break
+
+        filtered_students = {"students": [student for student in students_data if not (student["class_start_time"] == class_start_time and student["name"] == name)]}
+        if len(filtered_students["students"]) > 0:
+            return render_template('demo_students.html', data=filtered_students)
+        else:
+            return render_template('demo_students.html', error="全て入力済みです！<br>お疲れ様でした🚀", data={"students": []})
+
+# 【デモ】生徒情報の取得
+@app.route('/demo', methods=['GET'])
+def demo():
+    students = {"students": [
+        {
+            "index": 1001,
+            "class_start_time": "17:30",
+            "name": "山本 太郎",
+            "subject": "数学",
+            "key1": 1001,
+            "key2": 1001,
+            "key3": 1001,
+        },
+        {
+            "index": 1002,
+            "class_start_time": "17:30",
+            "name": "山田 花子",
+            "subject": "国語",
+            "key1": 1002,
+            "key2": 1002,
+            "key3": 1002,
+        },
+        {
+            "index": 1003,
+            "class_start_time": "17:30",
+            "name": "佐藤 次郎",
+            "subject": "社会",
+            "key1": 1003,
+            "key2": 1003,
+            "key3": 1003,
+        },
+        {
+            "index": 1004,
+            "class_start_time": "19:00",
+            "name": "鈴木 三郎",
+            "subject": "理科",
+            "key1": 1004,
+            "key2": 1004,
+            "key3": 1004,
+        },
+
+    ]}
+
+    return render_template('demo_students.html', data=students)
 
 if __name__ == '__main__':
     app.run(host="0.0.0.0", port=8080, debug=True)

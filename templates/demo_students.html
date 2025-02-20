@@ -1,0 +1,184 @@
+{% extends "layout.html" %}
+
+{% block content %}
+<div class="container">
+    <h1 class="title">【デモ】スクレポ入力</h1>
+    <div class="wrap">
+        <a href="/"><button type="button" id="toggle_button">ホームへ戻る</button></a>
+    </div>
+
+    {% if data and data['students'] | length > 0 %}
+        <div class="students_wrap">
+            {% for student in data["students"] %}
+                <form action="/demo_register" method="post">
+                    <!-- 生徒情報 -->
+                    <div class="content">
+                        <div class="student_name">
+                            <label for="student_{{ student.index }}">{{student.class_start_time}}〜【{{ student.subject }}】{{ student.name }}</label>
+                        </div>
+                        <button type="submit" class="register_button">登録</button>
+                    </div>
+
+                    <!-- スクレポ入力欄 -->
+                    <textarea
+                        name="content_{{ student.index }}"
+                        class="student_comment"
+                        id="content_{{ student.index }}"
+                        cols="30"
+                        rows="5"
+                        placeholder="スクレポを入力"
+                        oninput="saveText(this.id, this.value)"
+                    ></textarea>
+
+                    <!-- 追加情報のトグルボタン -->
+                    <button type="button" class="toggle-btn" onclick="sliderDetails('{{ student.index }}')">
+                        ▶︎ 追加情報
+                    </button>
+
+                    <!-- 追加情報 -->
+                    <div id="student_details_{{ student.index }}" hidden>
+                        <!-- 遅刻情報 -->
+                        <div class="toggle-container">
+                            <span class="detail_span" id="late_value">遅刻【無】</span>
+                            <input type="range" id="late_slider" min="0" max="1" value="0" list="late_list">
+                            <datalist id="late_list">
+                                <option value="0"></option>
+                                <option value="1"></option>
+                            </datalist>
+                        </div>
+                        <!-- 前回の宿題情報 -->
+                        <div class="toggle-container">
+                            <span class="detail_span" id="homework_value">宿題【OK】</span>
+                            <input type="range" id="homework_slider" min="0" max="3" step="1" value="3" list="homework_list">
+                            <datalist id="homework_list">
+                                <option value="0"></option>
+                                <option value="1"></option>
+                                <option value="2"></option>
+                                <option value="3"></option>
+                            </datalist>
+                        </div>
+                        <!-- 授業中の集中力情報 -->
+                        <div class="toggle-container">
+                            <span class="detail_span" id="concentration_value">集中力【普通】</span>
+                            <input type="range" id="concentration_slider" min="0" max="4" step="1" value="2" list="concentration_list">
+                            <datalist id="concentration_list">
+                                <option value="0"></option>
+                                <option value="1"></option>
+                                <option value="2"></option>
+                                <option value="3"></option>
+                                <option value="4"></option>
+                            </datalist>
+                        </div>
+                        <!-- 授業中の理解度情報 -->
+                        <div class="toggle-container">
+                            <span class="detail_span" id="understanding_value">理解度【普通】</span>
+                            <input type="range" id="understanding_slider" min="0" max="4" step="1" value="2" list="understanding_list">
+                            <datalist id="understanding_list">
+                                <option value="0"></option>
+                                <option value="1"></option>
+                                <option value="2"></option>
+                                <option value="3"></option>
+                                <option value="4"></option>
+                            </datalist>
+                        </div>
+                        <!-- 本日の宿題情報 -->
+                        <div class="toggle-container">
+                            <span class="detail_span" id="today_homework_value">本日の宿題【有】</span>
+                            <input type="range" id="today_homework_slider" min="0" max="1" step="1" value="1" list="today_homework_list">
+                            <datalist id="today_homework_list">
+                                <option value="0"></option>
+                                <option value="1"></option>
+                            </datalist>
+                        </div>
+                    </div>
+
+                    <input type="hidden" name="students" value="{{ data['students'] }}">
+                    <input type="hidden" name="index" value="{{ student.index }}">
+                    <input type="hidden" name="user_id" value="{{ user_id }}">
+                    <input type="hidden" name="key1" value="{{ student.key1 }}">
+                    <input type="hidden" name="key2" value="{{ student.key2 }}">
+                    <input type="hidden" name="key3" value="{{ student.key3 }}">
+                </form>
+            {% endfor %}
+        </div>
+    {% elif error %}
+        <div class="no_student_wrap">
+            <p class="no_student" style="color: #9B003F;">{{ error | safe }}</p>
+        </div>
+    {% else %}
+        <div class="no_student_wrap">
+            <p class="no_student" style="color:#1f2c5c;">授業はありません💤</p>
+        </div>
+    {% endif %}
+</div>
+
+<script>
+    // 未登録のスクレポを一時保存
+    function saveText(student_id, text) {
+        localStorage.setItem(student_id, text);
+    }
+
+    // スクレポをテキストボックスに格納
+    window.addEventListener("load", function() {
+        const students = JSON.parse('{{ data["students"] | tojson | safe }}');
+        students.forEach(student => {
+            const student_id = "content_" + student.index;
+
+            let content = "";
+            // 登録済みの場合
+            if (student.content) {
+                content = student.content;
+                localStorage.setItem(student_id, content);
+            }
+            // 未登録の場合
+            else {
+                content = localStorage.getItem(student_id);
+            }
+
+            document.getElementById(student_id).value = content;
+        });
+    });
+
+    // 追加情報のスライダー表示
+    function sliderDetails(index) {
+        const details = document.getElementById("student_details_" + index);
+        const button = event.target;
+
+        if (details.hidden) {
+            details.hidden = false;
+            button.textContent = "▼ 追加情報";
+        } else {
+            details.hidden = true;
+            button.textContent = "▶︎ 追加情報";
+        }
+    }
+
+    // スライダーの値に応じてメッセージを変更
+    function changeMessageStatus(values, slider_id, value_id) {
+        const slider = document.getElementById(slider_id);
+        const value = document.getElementById(value_id);
+        value.textContent = values[slider.value];
+        slider.addEventListener("input", function() {
+            value.textContent = values[this.value];
+        });
+    }
+
+    // 変更するメッセージ
+    window.addEventListener("load", function() {
+        const late_values = ["遅刻【無】", "遅刻【有】"];
+        changeMessageStatus(late_values, "late_slider", "late_value");
+
+        const homework = ["宿題【無】", "宿題【忘】", "宿題【一部不備】", "宿題【OK】"];
+        changeMessageStatus(homework, "homework_slider", "homework_value");
+
+        const concentration = ["集中力【最悪】", "集中力【悪い】", "集中力【普通】", "集中力【良い】", "集中力【最良】"];
+        changeMessageStatus(concentration, "concentration_slider", "concentration_value");
+
+        const understanding = ["理解度【最悪】", "理解度【悪い】", "理解度【普通】", "理解度【良い】", "理解度【最良】"];
+        changeMessageStatus(understanding, "understanding_slider", "understanding_value");
+
+        const today_homework = ["本日の宿題【無】", "本日の宿題【有】"];
+        changeMessageStatus(today_homework, "today_homework_slider", "today_homework_value");
+    });
+</script>
+{% endblock %}
