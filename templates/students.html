@@ -39,7 +39,7 @@
                     <div id="student_details_{{ student.index }}" hidden>
                         <!-- 遅刻情報 -->
                         <div class="slider-container">
-                            <span class="detail_span" id="late_value">遅刻【無】</span>
+                            <span class="detail_span" id="late_value_{{ student.index }}">遅刻【無】</span>
                             <input type="range" name="late" id="late_{{ student.index }}" min="0" max="1" list="late_list" oninput="saveInfo(this.id, this.value)" onchange="saveInfo(this.id, this.value)">
                             <datalist id="late_list">
                                 <option value="0"></option>
@@ -48,7 +48,7 @@
                         </div>
                         <!-- 前回の宿題情報 -->
                         <div class="slider-container">
-                            <span class="detail_span" id="homework_value">宿題【OK】</span>
+                            <span class="detail_span" id="homework_value_{{ student.index }}">宿題【OK】</span>
                             <input type="range" name="homework" id="homework_{{ student.index }}" min="0" max="3" step="1" list="homework_list" oninput="saveInfo(this.id, this.value)" onchange="saveInfo(this.id, this.value)">
                             <datalist id="homework_list">
                                 <option value="0"></option>
@@ -59,7 +59,7 @@
                         </div>
                         <!-- 授業中の集中力情報 -->
                         <div class="slider-container">
-                            <span class="detail_span" id="concentration_value">集中力【普通】</span>
+                            <span class="detail_span" id="concentration_value_{{ student.index }}">集中力【普通】</span>
                             <input type="range" name="concentration" id="concentration_{{ student.index }}" min="0" max="4" step="1" list="concentration_list" oninput="saveInfo(this.id, this.value)" onchange="saveInfo(this.id, this.value)">
                             <datalist id="concentration_list">
                                 <option value="0"></option>
@@ -71,7 +71,7 @@
                         </div>
                         <!-- 授業中の理解度情報 -->
                         <div class="slider-container">
-                            <span class="detail_span" id="understanding_value">理解度【普通】</span>
+                            <span class="detail_span" id="understanding_value_{{ student.index }}">理解度【普通】</span>
                             <input type="range" name="understanding" id="understanding_{{ student.index }}" min="0" max="4" step="1" list="understanding_list" oninput="saveInfo(this.id, this.value)" onchange="saveInfo(this.id, this.value)">
                             <datalist id="understanding_list">
                                 <option value="0"></option>
@@ -83,7 +83,7 @@
                         </div>
                         <!-- 本日の宿題情報 -->
                         <div class="slider-container">
-                            <span class="detail_span" id="today_homework_value">本日の宿題【有】</span>
+                            <span class="detail_span" id="today_homework_value_{{ student.index }}">本日の宿題【有】</span>
                             <input type="range" name="today_homework" id="today_homework_{{ student.index }}" min="0" max="1" step="1" list="today_homework_list" oninput="saveInfo(this.id, this.value)" onchange="saveInfo(this.id, this.value)">
                             <datalist id="today_homework_list">
                                 <option value="0"></option>
@@ -186,6 +186,8 @@
     function changeMessageStatus(values, slider_id, value_id) {
         const slider = document.getElementById(slider_id);
         const value = document.getElementById(value_id);
+        if (!slider || !value) return;
+
         value.textContent = values[slider.value];
         slider.addEventListener("input", function() {
             value.textContent = values[this.value];
@@ -194,20 +196,25 @@
 
     // 変更するメッセージ
     window.addEventListener("load", function() {
-        const late_values = ["遅刻【無】", "遅刻【有】"];
-        changeMessageStatus(late_values, "late_slider", "late_value");
+        const students = JSON.parse('{{ data["students"] | tojson | safe }}');
 
-        const homework = ["宿題【無】", "宿題【忘】", "宿題【一部不備】", "宿題【OK】"];
-        changeMessageStatus(homework, "homework_slider", "homework_value");
+        students.forEach(student => {
+            const index = student.index;
 
-        const concentration = ["集中力【最悪】", "集中力【悪い】", "集中力【普通】", "集中力【良い】", "集中力【最良】"];
-        changeMessageStatus(concentration, "concentration_slider", "concentration_value");
+            // 各スライダーのID
+            const late_id = "late_" + index;
+            const homework_id = "homework_" + index;
+            const concentration_id = "concentration_" + index;
+            const understanding_id = "understanding_" + index;
+            const today_homework_id = "today_homework_" + index;
 
-        const understanding = ["理解度【最悪】", "理解度【悪い】", "理解度【普通】", "理解度【良い】", "理解度【最良】"];
-        changeMessageStatus(understanding, "understanding_slider", "understanding_value");
-
-        const today_homework = ["本日の宿題【無】", "本日の宿題【有】"];
-        changeMessageStatus(today_homework, "today_homework_slider", "today_homework_value");
+            // メッセージとスライダーを対応させる
+            changeMessageStatus(["遅刻【無】", "遅刻【有】"], late_id, "late_value_" + index);
+            changeMessageStatus(["宿題【無】", "宿題【忘】", "宿題【一部不備】", "宿題【OK】"], homework_id, "homework_value_" + index);
+            changeMessageStatus(["集中力【最悪】", "集中力【悪い】", "集中力【普通】", "集中力【良い】", "集中力【最良】"], concentration_id, "concentration_value_" + index);
+            changeMessageStatus(["理解度【最悪】", "理解度【悪い】", "理解度【普通】", "理解度【良い】", "理解度【最良】"], understanding_id, "understanding_value_" + index);
+            changeMessageStatus(["本日の宿題【無】", "本日の宿題【有】"], today_homework_id, "today_homework_value_" + index);
+        });
     });
 </script>
 {% endblock %}
