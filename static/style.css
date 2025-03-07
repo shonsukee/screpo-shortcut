@@ -184,7 +184,7 @@ textarea.student_comment:focus {
     box-shadow: 0 0 5px rgba(0, 163, 176, 0.5);
 }
 
-.toggle-container {
+.slider-container {
     display: flex;
     justify-content: center;
     align-items: center;

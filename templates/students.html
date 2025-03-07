@@ -27,29 +27,29 @@
                         cols="30"
                         rows="5"
                         placeholder="スクレポを入力"
-                        oninput="saveText(this.id, this.value)"
+                        oninput="saveInfo(this.id, this.value)"
                     ></textarea>
 
                     <!-- 追加情報のトグルボタン -->
-                    <button type="button" class="toggle-btn" onclick="sliderDetails('{{ student.index }}')">
+                    <button type="button" class="slider-btn" onclick="sliderDetails('{{ student.index }}')">
                         ▶︎ 追加情報
                     </button>
 
                     <!-- 追加情報 -->
                     <div id="student_details_{{ student.index }}" hidden>
                         <!-- 遅刻情報 -->
-                        <div class="toggle-container">
+                        <div class="slider-container">
                             <span class="detail_span" id="late_value">遅刻【無】</span>
-                            <input type="range" id="late_slider" min="0" max="1" value="0" list="late_list">
+                            <input type="range" name="late" id="late_{{ student.index }}" min="0" max="1" list="late_list" oninput="saveInfo(this.id, this.value)" onchange="saveInfo(this.id, this.value)">
                             <datalist id="late_list">
                                 <option value="0"></option>
                                 <option value="1"></option>
                             </datalist>
                         </div>
                         <!-- 前回の宿題情報 -->
-                        <div class="toggle-container">
+                        <div class="slider-container">
                             <span class="detail_span" id="homework_value">宿題【OK】</span>
-                            <input type="range" id="homework_slider" min="0" max="3" step="1" value="3" list="homework_list">
+                            <input type="range" name="homework" id="homework_{{ student.index }}" min="0" max="3" step="1" list="homework_list" oninput="saveInfo(this.id, this.value)" onchange="saveInfo(this.id, this.value)">
                             <datalist id="homework_list">
                                 <option value="0"></option>
                                 <option value="1"></option>
@@ -58,9 +58,9 @@
                             </datalist>
                         </div>
                         <!-- 授業中の集中力情報 -->
-                        <div class="toggle-container">
+                        <div class="slider-container">
                             <span class="detail_span" id="concentration_value">集中力【普通】</span>
-                            <input type="range" id="concentration_slider" min="0" max="4" step="1" value="2" list="concentration_list">
+                            <input type="range" name="concentration" id="concentration_{{ student.index }}" min="0" max="4" step="1" list="concentration_list" oninput="saveInfo(this.id, this.value)" onchange="saveInfo(this.id, this.value)">
                             <datalist id="concentration_list">
                                 <option value="0"></option>
                                 <option value="1"></option>
@@ -70,9 +70,9 @@
                             </datalist>
                         </div>
                         <!-- 授業中の理解度情報 -->
-                        <div class="toggle-container">
+                        <div class="slider-container">
                             <span class="detail_span" id="understanding_value">理解度【普通】</span>
-                            <input type="range" id="understanding_slider" min="0" max="4" step="1" value="2" list="understanding_list">
+                            <input type="range" name="understanding" id="understanding_{{ student.index }}" min="0" max="4" step="1" list="understanding_list" oninput="saveInfo(this.id, this.value)" onchange="saveInfo(this.id, this.value)">
                             <datalist id="understanding_list">
                                 <option value="0"></option>
                                 <option value="1"></option>
@@ -82,9 +82,9 @@
                             </datalist>
                         </div>
                         <!-- 本日の宿題情報 -->
-                        <div class="toggle-container">
+                        <div class="slider-container">
                             <span class="detail_span" id="today_homework_value">本日の宿題【有】</span>
-                            <input type="range" id="today_homework_slider" min="0" max="1" step="1" value="1" list="today_homework_list">
+                            <input type="range" name="today_homework" id="today_homework_{{ student.index }}" min="0" max="1" step="1" list="today_homework_list" oninput="saveInfo(this.id, this.value)" onchange="saveInfo(this.id, this.value)">
                             <datalist id="today_homework_list">
                                 <option value="0"></option>
                                 <option value="1"></option>
@@ -130,11 +130,11 @@
     });
 
     // 未登録のスクレポを一時保存
-    function saveText(student_id, text) {
+    function saveInfo(student_id, text) {
         localStorage.setItem(student_id, text);
     }
 
-    // スクレポをテキストボックスに格納
+    // 既存アプリから取得したスクレポをテキストボックスに格納
     window.addEventListener("load", function() {
         const students = JSON.parse('{{ data["students"] | tojson | safe }}');
         students.forEach(student => {
@@ -152,6 +152,19 @@
             }
 
             document.getElementById(student_id).value = content;
+
+            // スライダーをローカルストレージの値に設定
+            const late_id = "late_" + student.index;
+            const homework_id = "homework_" + student.index;
+            const concentration_id = "concentration_" + student.index;
+            const understanding_id = "understanding_" + student.index;
+            const today_homework_id = "today_homework_" + student.index;
+
+            document.getElementById(late_id).value = localStorage.getItem(late_id) || 0;
+            document.getElementById(homework_id).value = localStorage.getItem(homework_id) || 3;
+            document.getElementById(concentration_id).value = localStorage.getItem(concentration_id) || 2;
+            document.getElementById(understanding_id).value = localStorage.getItem(understanding_id) || 2;
+            document.getElementById(today_homework_id).value = localStorage.getItem(today_homework_id) || 1;
         });
     });
 
