@@ -161,10 +161,19 @@ def login(driver, user_id, password):
         return e
 
 # スクレポを登録
-def process_register(user_id, password, students, index, content):
+def process_register(user_id, password, students_data, sukurepo_data):
     with BROWSER_ACCESS_LOCK:
         try:
             start_time = datetime.datetime.now()
+
+            # 入力を取得
+            index = sukurepo_data['index']
+            content = sukurepo_data[f'content_{index}']
+            late = sukurepo_data['late']
+            homework = sukurepo_data['homework']
+            concentration = sukurepo_data['concentration']
+            understanding = sukurepo_data['understanding']
+            today_homework = sukurepo_data['today_homework']
 
             # 1. ログイン処理
             driver = get_browser_instance()
@@ -177,7 +186,7 @@ def process_register(user_id, password, students, index, content):
 
             # 3. 生徒個別ページへ遷移
             key1, key2, key3 = next(
-                ((s["key1"], s["key2"], s["key3"]) for s in students if s["index"] == index),
+                ((s["key1"], s["key2"], s["key3"]) for s in students_data if s["index"] == index),
                 (1, 1, 1)
             )
             xpath = f'//button[contains(@onclick, "grid_click( {key1}, {key2}, {key3} );")]'
@@ -195,11 +204,60 @@ def process_register(user_id, password, students, index, content):
             WebDriverWait(driver, 2).until(
                 EC.presence_of_element_located((By.ID, "com_teacher"))
             )
+
+
             # テキストを記入
             textarea = driver.find_element(By.XPATH, "//textarea[@id='com_teacher']")
             textarea.clear()
             textarea.send_keys(content)
             print("テキスト入力", datetime.datetime.now()-start_time)
+
+            # 追加情報処理
+            ## 遅刻有の場合
+            if late != "0":
+                late_button = WebDriverWait(driver, 2).until(
+                    EC.element_to_be_clickable((By.XPATH, "//*[@id='delay_group']//label"))
+                )
+                late_button.click()
+
+            ## 宿題をやっていない場合
+            if homework != "3":
+                id = int(homework)
+                key = ['buttonB2', 'button_A2', 'button_B1']
+
+                homework_button = WebDriverWait(driver, 2).until(
+                    EC.element_to_be_clickable((By.XPATH, f"//*[@id='homework_group']//*[@id='{key[id]}']//label"))
+                )
+                homework_button.click()
+
+            ## 集中力
+            if concentration != "2":
+                key = ['E', 'D', 'C', 'B', 'A']
+                button_id = "button_" + key[int(concentration)]
+
+                concentration_button = WebDriverWait(driver, 2).until(
+                    EC.element_to_be_clickable((By.XPATH, f"//*[@id='concentration_group']//*[@id='{button_id}']//label"))
+                )
+                concentration_button.click()
+
+            ## 理解度
+            if understanding != "2":
+                key = ['E', 'D', 'C', 'B', 'A']
+                button_id = "button_" + key[int(understanding)]
+
+                understanding_button = WebDriverWait(driver, 2).until(
+                    EC.element_to_be_clickable((By.XPATH, f"//*[@id='knowledge_group']//*[@id='{button_id}']//label"))
+                )
+                understanding_button.click()
+
+            ## 本日の宿題がない場合
+            if today_homework != "1":
+                today_homework_button = WebDriverWait(driver, 2).until(
+                    EC.presence_of_element_located((By.XPATH, '//*[@id="todays_homework_group"]//*[@id="button_B"]//label'))
+                )
+                driver.execute_script("arguments[0].scrollIntoView({block: 'center'});", today_homework_button)
+                driver.execute_script("arguments[0].click();", today_homework_button)
+
 
             # 登録ボタン押下
             register_button = WebDriverWait(driver, 2).until(
@@ -283,14 +341,24 @@ def register():
             return render_template('students.html', error="ログイン情報が不足しています🥺", data={ "students": [] })
         session['user_id'] = user_id
         session['password'] = password
-
-        # スクレポ内容を取得
         index = int(request.form.get('index'))
-        content = request.form.get(f'content_{index}')
+        sukurepo_data = {
+            "index": index,
+            f"content_{index}": request.form.get(f'content_{index}'),
+            "late": request.form.get('late'),
+            "homework": request.form.get('homework'),
+            "concentration": request.form.get('concentration'),
+            "understanding": request.form.get('understanding'),
+            "today_homework": request.form.get('today_homework'),
+        }
 
         # 生徒情報を取得
         students_json = request.form.get('students').replace("'", '"')
         students_data = json.loads(students_json)
+
+        thread = threading.Thread(target=process_register, args=[user_id, password, students_data, sukurepo_data], daemon=True)
+        thread.start()
+
         class_start_time = ""
         name = ""
         for student in students_data:
@@ -299,8 +367,6 @@ def register():
                 name = student['name']
                 break
 
-        thread = threading.Thread(target=process_register, args=[user_id, password, students_data, index, content], daemon=True)
-        thread.start()
         filtered_students = {"students": [student for student in students_data if not (student["class_start_time"] == class_start_time and student["name"] == name)]}
         if len(filtered_students["students"]) > 0:
             return render_template('students.html', user_id=user_id, data=filtered_students)
