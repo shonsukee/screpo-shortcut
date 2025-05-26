@@ -82,3 +82,20 @@ def login(driver, user_id, password):
     except Exception as e:
         print("ログインエラーが発生しました: ", type(e).__name__, str(e))
         return e
+
+def logout(driver):
+    try:
+        print("---------- logout開始 --------------")
+        start_time = datetime.datetime.now()
+        print(f"ログアウト開始: {start_time}")
+
+        # クッキーを削除
+        driver.delete_all_cookies()
+
+        print(f"クッキー削除完了: {datetime.datetime.now() - start_time}")
+        print("---------- logout終了 --------------")
+        return True
+
+    except Exception as e:
+        print("ログアウトエラーが発生しました: ", type(e).__name__, str(e))
+        return False

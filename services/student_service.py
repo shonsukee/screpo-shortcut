@@ -3,7 +3,7 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.common.exceptions import TimeoutException
-from services.browser_service import get_browser_instance, login
+from services.browser_service import get_browser_instance, login, logout
 from utils.lock_utils import BROWSER_ACCESS_LOCK
 
 # スクレポURL
@@ -57,6 +57,8 @@ def process_students(user_id, password):
         except Exception as e:
             print("例外が発生しました:",  type(e).__name__, str(e))
             return e
+        finally:
+            logout(driver)
 
 def process_register(user_id, password, students_data, sukurepo_data):
     with BROWSER_ACCESS_LOCK:
@@ -179,3 +181,6 @@ def process_register(user_id, password, students_data, sukurepo_data):
 
         except Exception as e:
             print("****** エラー発生 ******", type(e).__name__, str(e))
+
+        finally:
+            logout(driver)
