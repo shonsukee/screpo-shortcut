@@ -1,12 +1,18 @@
+import sentry_sdk
 import os
 from dotenv import load_dotenv
 from flask import Flask, render_template
-from werkzeug.middleware.proxy_fix import ProxyFix  # 追加
+from werkzeug.middleware.proxy_fix import ProxyFix
 from routes.student_routes import student_bp
 from routes.register_routes import register_bp
 from routes.demo_routes import demo_bp
 
 load_dotenv()
+
+sentry_sdk.init(
+    dsn=os.getenv('SENTRY_DSN'),
+    send_default_pii=True,
+)
 
 app = Flask(__name__)
 
