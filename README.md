@@ -69,6 +69,12 @@ screpo-shortcutは，【塾の業務を効率化する】ためのWebアプリ�
     - Render
 
 
+## ▶︎ 開発
+```
+python -m venv .venv
+pip install -r requirements.txt
+python -m playwright install --with-deps chromium
+```
 
 ## ▶︎ Lisence
 This project is licensed under the MIT License, see the LICENSE file for details

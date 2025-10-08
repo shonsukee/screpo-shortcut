@@ -1,11 +1,16 @@
-import sentry_sdk
 import os
+import sentry_sdk
 from dotenv import load_dotenv
-from flask import Flask, render_template
-from werkzeug.middleware.proxy_fix import ProxyFix
-from routes.student_routes import student_bp
-from routes.register_routes import register_bp
-from routes.demo_routes import demo_bp
+from fastapi import FastAPI, Request
+from fastapi.responses import HTMLResponse
+from fastapi.middleware import Middleware
+from starlette.middleware.sessions import SessionMiddleware
+from starlette.staticfiles import StaticFiles
+from starlette.templating import Jinja2Templates
+
+from routes.student_routes import router as student_router
+from routes.register_routes import router as register_router
+from routes.demo_routes import router as demo_router
 
 load_dotenv()
 
@@ -14,35 +19,37 @@ sentry_sdk.init(
     send_default_pii=True,
 )
 
-app = Flask(__name__)
-
-# --- セキュリティ／設定 ---
 SECRET_KEY = os.getenv('SECRET_KEY')
 if not SECRET_KEY:
     raise RuntimeError("SECRET_KEY is not set. Set it in your environment/.env for production.")
 
-app.config['SECRET_KEY'] = SECRET_KEY
-app.config['SESSION_COOKIE_NAME'] = os.getenv('SESSION_COOKIE_NAME', 'session')
-app.config.update(
-    SESSION_COOKIE_SECURE=True,      # HTTPSのみ
-    SESSION_COOKIE_SAMESITE="Lax",
-)
+middleware = [
+    Middleware(SessionMiddleware, secret_key=SECRET_KEY, same_site="lax", https_only=True, session_cookie="session")
+]
 
-app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1)
+app = FastAPI(middleware=middleware)
 
-app.register_blueprint(student_bp)
-app.register_blueprint(register_bp)
-app.register_blueprint(demo_bp)
+# static / templates
+app.mount("/static", StaticFiles(directory="static"), name="static")
+templates = Jinja2Templates(directory="templates")
 
-@app.route('/', methods=['GET'])
-def index():
-    return render_template('index.html',
-                           error="ログインして生徒情報を<br>取得してください<a href='/demo'>🕵️‍♀️</a>",
-                           data={"students": []})
+# ルータ登録
+app.include_router(student_router)
+app.include_router(register_router)
+app.include_router(demo_router)
+
+@app.get("/", response_class=HTMLResponse)
+async def index(request: Request):
+    return templates.TemplateResponse(
+        "index.html",
+        {
+            "request": request,
+            "error": "ログインして生徒情報を<br>取得してください<a href='/demo'>🕵️‍♀️</a>",
+            "data": {"students": []},
+            "user_id": request.session.get("user_id", ""),
+        },
+    )
 
 @app.get("/healthz")
-def healthz():
+async def healthz():
     return {"status": "ok"}, 200
-
-if __name__ == '__main__':
-    app.run(host="0.0.0.0", port=8080)

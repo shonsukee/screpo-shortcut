@@ -1,10 +1,12 @@
-from flask import Blueprint, render_template, request
-import json
+from fastapi import APIRouter, Request
+from starlette.responses import HTMLResponse
+from starlette.templating import Jinja2Templates
 
-demo_bp = Blueprint('demo', __name__)
+router = APIRouter()
+templates = Jinja2Templates(directory="templates")
 
-@demo_bp.route('/demo', methods=['GET'])
-def demo():
+@router.get("/demo", response_class=HTMLResponse)
+async def demo(request: Request):
     students = {"students": [
         {
             "index": 1001,
@@ -43,47 +45,42 @@ def demo():
             "key3": 1004,
         },
     ]}
+    return templates.TemplateResponse("demo_students.html", {"request": request, "data": students})
 
-    return render_template('demo_students.html', data=students)
+@router.get("/demo_register", response_class=HTMLResponse)
+async def demo_register_get(request: Request):
+    return templates.TemplateResponse(
+        "demo_students.html",
+        {"request": request, "error": "ホーム画面から<br>ログインしてください🙇", "data": {"students": []}},
+    )
 
-@demo_bp.route('/demo_register', methods=['GET', 'POST'])
-def demo_register():
-    if request.method == 'GET':
-        return render_template('demo_students.html', error="ホーム画面から<br>ログインしてください🙇", data={ "students": [] })
+@router.post("/demo_register", response_class=HTMLResponse)
+async def demo_register_post(request: Request):
+    form = await request.form()
 
-    elif request.method == 'POST':
-        print("****** スクレポ[デモ]登録開始 ******")
+    students_json = (form.get("students") or "").replace("'", '"')
+    import json
+    try:
+        students_data = json.loads(students_json)
+    except Exception:
+        return templates.TemplateResponse("demo_students.html", {"request": request, "error": "生徒情報の形式が不正です🥺", "data": {"students": []}})
 
-        # 生徒情報を取得
-        students_json = request.form.get('students')
-        if not students_json:
-            return render_template('demo_students.html', error="生徒情報が取得できませんでした🥺", data={ "students": [] })
-        
-        students_json = students_json.replace("'", '"')
-        try:
-            students_data = json.loads(students_json)
-        except json.JSONDecodeError:
-            return render_template('demo_students.html', error="生徒情報の形式が不正です🥺", data={ "students": [] })
+    index_str = form.get("index")
+    if not index_str:
+        return templates.TemplateResponse("demo_students.html", {"request": request, "error": "インデックスが指定されていません🥺", "data": {"students": []}})
+    try:
+        index = int(index_str)
+    except ValueError:
+        return templates.TemplateResponse("demo_students.html", {"request": request, "error": "無効なインデックスです🥺", "data": {"students": []}})
 
-        # インデックスの取得と検証
-        index_str = request.form.get('index')
-        if not index_str:
-            return render_template('demo_students.html', error="インデックスが指定されていません🥺", data={ "students": [] })
-        try:
-            index = int(index_str)
-        except ValueError:
-            return render_template('demo_students.html', error="無効なインデックスです🥺", data={ "students": [] })
+    class_start_time = ""
+    name = ""
+    for s in students_data:
+        if s["index"] == index:
+            class_start_time = s["class_start_time"]; name = s["name"]; break
 
-        class_start_time = ""
-        name = ""
-        for student in students_data:
-            if student['index'] == index:
-                class_start_time = student['class_start_time']
-                name = student['name']
-                break
-
-        filtered_students = {"students": [student for student in students_data if not (student["class_start_time"] == class_start_time and student["name"] == name)]}
-        if len(filtered_students["students"]) > 0:
-            return render_template('demo_students.html', data=filtered_students)
-        else:
-            return render_template('demo_students.html', error="全て入力済みです！<br>お疲れ様でした🚀", data={"students": []})
+    filtered = {"students": [s for s in students_data if not (s["class_start_time"] == class_start_time and s["name"] == name)]}
+    if filtered["students"]:
+        return templates.TemplateResponse("demo_students.html", {"request": request, "data": filtered})
+    else:
+        return templates.TemplateResponse("demo_students.html", {"request": request, "error": "全て入力済みです！<br>お疲れ様でした🚀", "data": {"students": []}})
