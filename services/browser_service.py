@@ -1,16 +1,15 @@
-import asyncio
 import datetime
 from playwright.async_api import async_playwright, TimeoutError as PwTimeout
+from utils.lock_utils import BROWSER_ACCESS_LOCK
 
 LOGIN_URL = "https://sukurepo.azurewebsites.net/teachers_report/T_report_login"
 
 _playwright = None
 _browser = None
-_browser_lock = asyncio.Lock()
 
 async def _ensure_browser():
     global _playwright, _browser
-    async with _browser_lock:
+    async with BROWSER_ACCESS_LOCK:
         if _playwright is None:
             _playwright = await async_playwright().start()
         if _browser is None:
@@ -24,14 +23,6 @@ async def _ensure_browser():
                 ],
             )
     return _browser
-
-async def reset_browser_instance():
-    global _browser
-    async with _browser_lock:
-        if _browser is not None:
-            await _browser.close()
-            _browser = None
-    return await _ensure_browser()
 
 async def get_browser_instance():
     return await _ensure_browser()
@@ -65,10 +56,10 @@ async def login(context, user_id: str, password: str):
 
     except PwTimeout as e:
         print("ログイン画面がタイムアウトしました...", type(e).__name__)
-        return e
+        raise e
     except Exception as e:
         print("ログインエラーが発生しました: ", type(e).__name__, str(e))
-        return e
+        raise e
 
 async def logout(context):
     """
@@ -81,4 +72,4 @@ async def logout(context):
         return True
     except Exception as e:
         print("ログアウトエラーが発生しました: ", type(e).__name__, str(e))
-        return False
+        raise False
